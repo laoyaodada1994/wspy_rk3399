@@ -64,13 +64,11 @@ void start_stojan(cJSON* ap,cJSON* sta,cJSON* para,uint8_t op_code)
 			}
 		}
 	}
-	js_size = cJSON_GetArraySize(sta);
-	for (int i=0;i<js_size;i++){
-		json_type = cJSON_GetArrayItem(sta, i)->type;
-		if(json_type == cJSON_String){
-			if(strcmp(cJSON_GetArrayItem(sta, i)->string,"mac") == 0){
-				mac = cJSON_GetArrayItem(sta, i)->valuestring;
-			}
+	cJSON* sta_mac = cJSON_GetObjectItem(sta, "mac");
+	if(sta_mac != NULL){
+		cJSON* mac_item = cJSON_GetArrayItem(sta_mac, 0);
+		if(mac_item != NULL){
+			mac = cJSON_GetArrayItem(sta_mac, 0)->valuestring;
 		}
 	}
 	if(op_code == 1){
@@ -215,13 +213,11 @@ void start_url_sniffer(cJSON* ap,cJSON* sta,cJSON* id,uint8_t op_code)
 				}
 			}
 		}
-		js_size = cJSON_GetArraySize(sta);
-		for (int i=0;i<js_size;i++){
-			json_type = cJSON_GetArrayItem(sta, i)->type;
-			if(json_type == cJSON_String){
-				if(strcmp(cJSON_GetArrayItem(sta, i)->string,"mac") == 0){
-					mac = cJSON_GetArrayItem(sta, i)->valuestring;
-				}
+		cJSON* sta_mac = cJSON_GetObjectItem(sta, "mac");
+		if(sta_mac != NULL){
+			cJSON* mac_item = cJSON_GetArrayItem(sta_mac, 0);
+			if(mac_item != NULL){
+				mac = cJSON_GetArrayItem(sta_mac, 0)->valuestring;
 			}
 		}
 
@@ -260,7 +256,7 @@ void url_sniffer_parse()
 	int    size = 0, readsize = 0;
 	cJSON *root, *array, *array_item;
 	char   json_type = 0;
-	char   out_str[1024], tmp[64];
+	char   out_str[1024], tmp[128];
 
 	sprintf(filename, "/tmp/url_%s.json", g_turl_data.id_str);
 	printf("%s\n", filename);
@@ -346,15 +342,19 @@ void url_sniffer_parse()
 	            } else if (strcmp(array->string, "OS_ver") == 0) {
 	                array_item = cJSON_GetArrayItem(array, 0);
 	                if (array_item != NULL) {
-	                    sprintf(tmp, "\"version\":\"%s\"", array_item->valuestring);
+	                    sprintf(tmp, "\"version\":\"%s\",", array_item->valuestring);
 	                    printf("%s\n", tmp);
 	                    strcat(out_str, tmp);
 	                } else {
-	                    sprintf(tmp, "\"version\":\"\"");
+	                    sprintf(tmp, "\"version\":\"\",");
 	                    printf("%s\n", tmp);
 	                    strcat(out_str, tmp);
 	                }
-	            }
+	            }else if (strcmp(array->string, "dev") == 0) {//  增加设备型号字段 20201128
+	            	sprintf(tmp,"\"dev\":%s",cJSON_Print(array));
+//	            	strcpy(tmp,cJSON_Print(array));
+	            	strcat(out_str, tmp);
+				}
 	        }
 	    }
 	    strcat(out_str, "}");

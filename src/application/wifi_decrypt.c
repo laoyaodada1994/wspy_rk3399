@@ -54,11 +54,11 @@ void wifi_decrypt_setchl(uint8_t ucchl)
 {
 	char cmdbuf[128];
 	memset(cmdbuf,0,sizeof(cmdbuf));
-#ifdef WSPY_CAR //设置前端的角度和信道
-    gimbal_set_angle(ScanPolicy[ucchl].angle.start);
-#else
-	gimbal_set_angle(ScanPolicy[ucchl].angle.start,WifiDecrypt.channel);
-#endif
+//#ifdef WSPY_CAR //设置前端的角度和信道
+//    gimbal_set_angle(ScanPolicy.angle.start);
+//#else
+//	gimbal_set_angle(ScanPolicy.angle.start,WifiDecrypt.channel);
+//#endif
 	sprintf(cmdbuf,"iwconfig %s channel %d",PcapInterface[ucchl],WifiDecrypt.channel);//控制网卡信道切换
 	system(cmdbuf);
 
@@ -82,7 +82,6 @@ int wifi_decrypt_policy_parse(cJSON* param)
 	char *encryption = NULL;
 
 	memset(data, 0, sizeof(data));
-	memset(&WifiDecrypt, 0, sizeof(WifiDecrypt));
 
 	const char *protocol = NULL;
 	uint8_t ucchl;
@@ -188,6 +187,9 @@ int wifi_decrypt_policy_parse(cJSON* param)
 
 		memcpy(packet_data[i] , &u32sn, sizeof(u32sn));
 		packet_data_len[i] = sizeof(u32sn);
+		strcpy((char *)(packet_data[i]+sizeof(u32sn)),WifiDecrypt.decr_id);
+		printf("dev id %s\n",(char *)(packet_data[i]+sizeof(u32sn)));
+		packet_data_len[i]+=DEV_ID_LEN;
 		pcapfilehead_t *pcap=(pcapfilehead_t *)(packet_data[i]+packet_data_len[i]);
 		pcap->magic=htonl(0xd4c3b2a1);
 		pcap->major =0x0002;// htons(0x0002);
@@ -197,10 +199,8 @@ int wifi_decrypt_policy_parse(cJSON* param)
 		pcap->snaplen=65535;//htonl(65535);
 		pcap->linktype=0x7f;//htonl(0x7f);
 		packet_data_len[i]+=sizeof(pcapfilehead_t);
-//		for(int j=0;j<packet_data_len[i];j++){
-//			printf("%#02x,",packet_data[i][j]);
-//		}
-		printf("DeviceSN 0x%02x%02x%02x%02x\n", packet_data[i][0], packet_data[i][1], packet_data[i][2], packet_data[i][3]);
+
+		printf("DeviceSN 0x%02x%02x%02x%02x \n", packet_data[i][0], packet_data[i][1], packet_data[i][2], packet_data[i][3]);
 	}
 #endif
 //	crc32_init(0x4C11DB7);
@@ -218,6 +218,7 @@ void wifi_decrypt_exit(void)
 	DecryptOn = false;
 	stop_sniffer();
 	stop_ap_inter();
+	printf("%s\n",__func__);
 #if 0
 	for(int i=0;i<MAX_CAP_STA_NUM;i++){
 		for(int j=0;j<KEY_MESSAGE_NUM;j++){
@@ -325,7 +326,54 @@ void add_eapol_packet(struct eapol_info_t * eapol, const struct pcap_pkthdr * pk
 	}
 }
 #else
-
+/*****************************************************************
+* 函数描述：握手包id比较函数，用于比较当前接收id 与存储id是否匹配
+* 参数：		uint8_t input_id 当前输入id
+* 			uint8_t cur_id   缓存id
+* 返回值：  0 id 匹配
+* 		  -1 id 不匹配
+* ***************************************************************/
+int message_id_cmp(uint8_t input_id,uint8_t cur_id)
+{
+	int res=0;
+	switch(input_id){
+		case KEY_MESSAGE_1:res=-1;break;
+		case KEY_MESSAGE_2:{
+				if(cur_id !=KEY_MESSAGE_1&&cur_id !=0){
+					res=-1;
+				}
+			}
+			break;
+		case KEY_MESSAGE_3:{
+				if(cur_id !=KEY_MESSAGE_2){
+					res=-1;
+				}
+			}
+			break;
+//		case KEY_MESSAGE_4:{
+//				if(cur_id !=(KEY_MESSAGE_1|KEY_MESSAGE_2|KEY_MESSAGE_3)){
+//					res=-1;
+//				}
+//			}
+//			break;
+		default:res=-1;break;
+	}
+	return res;
+}
+/*****************************************************************
+* 函数描述：pcap头拷贝函数，用于64位头拷贝到32位头中
+* 参数：	  uint8_t* packet_data,  待拷贝数据头
+* 		  const struct pcap_pkthdr* pkthdr 拷贝数据头
+* 返回值：  无
+* ***************************************************************/
+static void pcap_hdr_cpy(uint8_t* packet_data, const struct pcap_pkthdr* pkthdr)
+{
+    struct pcap_pkthdr_32bit* pcaphdr32 = (struct pcap_pkthdr_32bit*)packet_data;
+    pcaphdr32->tv_sec                   = pkthdr->ts.tv_sec;
+    pcaphdr32->tv_usec                  = pkthdr->ts.tv_usec;
+    pcaphdr32->caplen                   = pkthdr->caplen;
+    pcaphdr32->len                      = pkthdr->len;
+}
 /*****************************************************************
  * 函数描述：握手包组帧函数，将抓取的握手包组成pcap文件，发送到上位机
  * 参数：		struct eapol_info_t *  握手包帧信息缓存指针
@@ -345,9 +393,6 @@ void add_eapol_packet(struct eapol_info_t * eapol, const struct pcap_pkthdr * pk
 	}
 
 	uint8_t flag = 0;
-//	int sn = get_message_sn(eapol->msg_id);
-//	if(sn < 0)
-//		return;
 
 	for(int n=0; n<MAX_CAP_STA_NUM; n++){
 		if (is_phy_addr_availible(EapolInfo[n].sta_mac) == false){ // different key message packet
@@ -359,39 +404,37 @@ void add_eapol_packet(struct eapol_info_t * eapol, const struct pcap_pkthdr * pk
 				}
 			}
 
-			if(flag == 1)
+			if(flag == 1||eapol->msg_id == KEY_MESSAGE_3||eapol->msg_id == KEY_MESSAGE_4)
 				break;
-
-			EapolInfo[n].msg_id |= eapol->msg_id;
+			printf("capture idx %d key message msg_id %d\n",n,eapol->msg_id);
+			EapolInfo[n].msg_id = eapol->msg_id;
 			memcpy(EapolInfo[n].sta_mac, eapol->sta_mac, sizeof(EapolInfo[n].sta_mac));
-			memcpy(packet_data[n] + packet_data_len[n], (void*)pkthdr, sizeof(struct pcap_pkthdr)); // save pcap_pkthdr
+			pcap_hdr_cpy(packet_data[n] + packet_data_len[n], pkthdr);// save pcap_pkthdr
+		//	memcpy(packet_data[n] + packet_data_len[n], (void*)pkthdr, sizeof(struct pcap_pkthdr)); // save pcap_pkthdr
 //			tmppkthdr=(struct pcap_pkthdr *)(packet_data[n] + packet_data_len[n]);
 //			tmppkthdr->len +=sizeof(crc_result);
 //			tmppkthdr->caplen+=sizeof(crc_result);
 //			printf("%s %d i %d len1 %d len2 \n",__func__,__LINE__,n, tmppkthdr->len,tmppkthdr->caplen);
-			packet_data_len[n] += sizeof(struct pcap_pkthdr);
+			packet_data_len[n] += sizeof(struct pcap_pkthdr_32bit);
 
 			memcpy(packet_data[n] + packet_data_len[n], packet,pkthdr->caplen); // save packet data
 			packet_data_len[n] += pkthdr->caplen;
 
-//			crc_result = crc32(0xffffffff, (uint8_t *)packet, pkthdr->caplen);
 //			memcpy(packet_data[n] + packet_data_len[n], &crc_result,sizeof(crc_result)); // crc
 //			packet_data_len[n] += sizeof(crc_result);
-			break;
+			return ;
 		}
 	}
 
 	for(int i=0; i<MAX_CAP_STA_NUM; i++){
 		if(memcmp(EapolInfo[i].sta_mac, eapol->sta_mac, sizeof(EapolInfo[i].sta_mac)) == 0){ //match sta mac
-			if((EapolInfo[i].msg_id & eapol->msg_id) == 0){ // different key message packet
+		//	if((EapolInfo[i].msg_id & eapol->msg_id) == 0){ // different key message packet
+			printf("capture idx %d key message msg_id %d\n",i,eapol->msg_id);
+			if(message_id_cmp(eapol->msg_id,EapolInfo[i].msg_id ) == 0){
 				EapolInfo[i].msg_id |= eapol->msg_id;
-				memcpy(packet_data[i] + packet_data_len[i], (void*)pkthdr, sizeof(struct pcap_pkthdr)); // save pcap_pkthdr
-//				tmppkthdr=(struct pcap_pkthdr *)(packet_data[i] + packet_data_len[i]);
-//				tmppkthdr->len +=sizeof(crc_result);
-//				tmppkthdr->caplen+=sizeof(crc_result);
-//
-//				printf("%s %d i %d len1 %d len2 \n",__func__,__LINE__,i, tmppkthdr->len,tmppkthdr->caplen);
-				packet_data_len[i] += sizeof(struct pcap_pkthdr);
+				//memcpy(packet_data[i] + packet_data_len[i], (void*)pkthdr, sizeof(struct pcap_pkthdr)); // save pcap_pkthdr
+				pcap_hdr_cpy(packet_data[i] + packet_data_len[i], pkthdr);
+				packet_data_len[i] += sizeof(struct pcap_pkthdr_32bit);
 
 				memcpy(packet_data[i] + packet_data_len[i], packet,pkthdr->caplen); // save packet data
 				packet_data_len[i] += pkthdr->caplen;
@@ -400,14 +443,14 @@ void add_eapol_packet(struct eapol_info_t * eapol, const struct pcap_pkthdr * pk
 //				memcpy(packet_data[i] + packet_data_len[i], (void *)&crc_result,sizeof(crc_result)); // crc
 //				packet_data_len[i] += sizeof(crc_result);
 				printf("%s %d i %d msg_id %#02x\n",__func__,__LINE__,i,EapolInfo[i].msg_id );
-				if(EapolInfo[i].msg_id == 0x0f){ // capture 4 key message packet
-//					DecryptOn = false;
-//					PcapOn = false;
+				if (EapolInfo[i].msg_id  == (KEY_MESSAGE_1|KEY_MESSAGE_2) || EapolInfo[i].msg_id == (KEY_MESSAGE_2|KEY_MESSAGE_3)){ // capture 4 key message packet
 					printf("%s %d i %d msg_id %#02x\n",__func__,__LINE__,i,EapolInfo[i].msg_id );
 					trans_file(packet_data[i], packet_data_len[i]);
 					printf("trans_file packet_data_len %d\n",packet_data_len[i]);
-					EapolInfo[i].msg_id=0;
-					packet_data_len[i]=4+sizeof(pcapfilehead_t);
+					for(int j=0; j<MAX_CAP_STA_NUM; j++){
+						packet_data_len[j]=DEV_ID_LEN+DEV_SN_LEN+sizeof(pcapfilehead_t);
+					}
+					memset(EapolInfo,0,sizeof(EapolInfo));
 					WifiDecrypt.resp_flag=0;
 //					for(int n=0;n<MAX_CAP_STA_NUM;n++){
 //						packet_data_len[n] = 0;
@@ -417,11 +460,20 @@ void add_eapol_packet(struct eapol_info_t * eapol, const struct pcap_pkthdr * pk
 //					memset(EapolInfo, 0, sizeof(struct eapol_info_t) * MAX_CAP_STA_NUM);
 				}
 			}
+			else{
+				for(int j=0; j<MAX_CAP_STA_NUM; j++){
+					packet_data_len[j]=DEV_ID_LEN+DEV_SN_LEN+sizeof(pcapfilehead_t);
+				}
+				memset(EapolInfo,0,sizeof(EapolInfo));
+				WifiDecrypt.resp_flag=0;
+				printf("error messid %d %d idx %d\n",EapolInfo[i].msg_id,eapol->msg_id,i);
+			}
 			break;
 		}
 	}
 }
 #endif
+
 /*****************************************************************
  * 函数描述：握手包解析函数，用于解析存储交互的握手数据包
  * 参数：		const struct pcap_pkthdr * pkthdr  pcap缓存指针
@@ -455,12 +507,16 @@ int do_wifi_decypt(const struct pcap_pkthdr * pkthdr, const uint8_t * packet, ui
 	if ((subType == ProbeResponse) && (WifiDecrypt.resp_flag == 0)){
 			WifiDecrypt.resp_flag = 1;
 			for(int i=0; i<MAX_CAP_STA_NUM; i++){
-				memcpy(packet_data[i] + packet_data_len[i], (void*)pkthdr, sizeof(struct pcap_pkthdr)); // save pcap_pkthdr
-				packet_data_len[i] += sizeof(struct pcap_pkthdr);
-
+				//memcpy(packet_data[i] + packet_data_len[i], (void*)pkthdr, sizeof(struct pcap_pkthdr)); // save pcap_pkthdr
+			    pcap_hdr_cpy(packet_data[i] + packet_data_len[i], pkthdr);
+				packet_data_len[i] += sizeof(struct pcap_pkthdr_32bit);
 				memcpy(packet_data[i] + packet_data_len[i], packet, pkthdr->caplen); // save packet data
 				packet_data_len[i] += pkthdr->caplen;
 			}
+//			for(int i=0; i<pkthdr->caplen;i++){
+//				printf("%#02x,",packet[i]);
+//			}
+//			printf("\n");
 	}
 	if (WifiDecrypt.encrypt == STD_WEP){
 			if ((subType == Authentication) && (WifiDecrypt.resp_flag == 1)){
@@ -478,7 +534,7 @@ int do_wifi_decypt(const struct pcap_pkthdr * pkthdr, const uint8_t * packet, ui
 					eapol_info.msg_id = KEY_MESSAGE_3;
 				}
 
-				printf("capture key message msg_id %d\n",eapol_info.msg_id);
+				//printf("capture key message msg_id %d\n",eapol_info.msg_id);
 
 				if (eapol_info.msg_id != KEY_MESSAGE_NONE){ // valid eapol packet
 					if(memcmp(bssid, src, 6) == 0) {//ap mac
@@ -525,9 +581,9 @@ int do_wifi_decypt(const struct pcap_pkthdr * pkthdr, const uint8_t * packet, ui
 							eapol_info.msg_id = KEY_MESSAGE_NONE;
 					} else if (WifiDecrypt.encrypt == STD_WPA2
 							&&(pdata[WPA_EAPOL_KEYDEC_OFFSET] == WPA2_EAPOL_KEY_DEC)){
-						if (type == 0x04)
+						if (type == 0x02)
 							eapol_info.msg_id = KEY_MESSAGE_1;
-						else if (type == 0x02)
+						else if (type == 0x04)
 							eapol_info.msg_id = KEY_MESSAGE_2;
 						else if (type == 0x0f)
 							eapol_info.msg_id = KEY_MESSAGE_3;
@@ -537,7 +593,7 @@ int do_wifi_decypt(const struct pcap_pkthdr * pkthdr, const uint8_t * packet, ui
 							eapol_info.msg_id = KEY_MESSAGE_NONE;
 					}
 
-					printf("capture key message msg_id %d\n",eapol_info.msg_id);
+					//printf("capture key message msg_id %d\n",eapol_info.msg_id);
 
 					if (eapol_info.msg_id != KEY_MESSAGE_NONE){ // valid eapol packet
 						if(memcmp(bssid, src, 6) == 0) {//ap mac

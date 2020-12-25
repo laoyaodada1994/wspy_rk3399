@@ -62,12 +62,46 @@ void mmget_thread_start(cJSON* param_mm)
 			while((p=strtok(NULL,"/"))!= NULL){
 				strcpy(g_tmm_data[cnt].filename,p);
 			}
-			printf("%s %s %s\n",g_tmm_data[cnt].filename,g_tmm_data[cnt].ftpfile,g_tmm_data[cnt].md5string);
+			strcpy(ftpfile,g_tmm_data[cnt].filename);
+			strtok(ftpfile,".");
+			while((p=strtok(NULL,"."))!= NULL){
+				strcpy(g_tmm_data[cnt].filetype,p);
+			}
+			printf("%s %s %s %s\n",g_tmm_data[cnt].filename,g_tmm_data[cnt].ftpfile,g_tmm_data[cnt].md5string,g_tmm_data[cnt].filetype);
 		}
 	}
 	pthread_create(&pid1, NULL, (void *)mmget_file, (void *)cnt);
 	usleep(1000);
 	pthread_detach(pid1);
+}
+/*****************************************************************
+* 函数描述： 木马文件删除，删除制定目录同一类型文件
+* 参数：	   int idx 文件索引号
+* 返回值： 无
+* 修改日期： modify by lpz 20201205 修改文件删除及判断功能，增加对文件类型结尾仍有其他字符的判断
+****************************************************************/
+void mmget_delete_file(int idx)
+{
+	char optpath[256];
+	char optres[32];
+	char update[128];
+	memset(optpath,0,sizeof(optpath));
+	memset(optres,0,sizeof(optres));
+	memset(update,0,sizeof(update));
+	sprintf(optpath,"rm -f %s/*.%s*",g_tmmfile.lftplpath,g_tmm_data[idx].filetype);
+	system(optpath);//ftps 下载文件
+	memset(optpath,0,sizeof(optpath));
+	sprintf(optpath,"ls %s/|grep *.%s |wc -l",g_tmmfile.lftplpath,g_tmm_data[idx].filetype);
+	sys_get(optpath, optres, sizeof(optres));//获取文件数目
+	if(atoi(optres) != 0){
+		sprintf(update,"delete-fail/detail:%s",g_tmm_data[idx].filename);
+		update_status("wifiMMFiles", update, NULL);
+	}
+	else{
+		sprintf(update,"delete-succ/detail:%s",g_tmm_data[idx].filename);
+		update_status("wifiMMFiles", update, NULL);
+	}
+	status_report();
 }
 /*****************************************************************
  * 函数描述：木马文件获取，用于从服务器下发木马文件
@@ -90,7 +124,7 @@ void *mmget_file(void* argv)
 			//sprintf(optpath,"lftp -c 'lftp %s ;lcd %s ; get %s ; exit'",g_tmmfile.lftphost,g_tmmfile.lftplpath,g_tmm_data[cnt].ftpfile);
 			sprintf(optpath,"lftp -c 'set ssl:verify-certificate no;set xfer:clobber on;lcd %s ;get ftp://%s:21../../..%s; exit'",g_tmmfile.lftplpath,g_tmmfile.lftphost,g_tmm_data[cnt].ftpfile);
 			printf("%s\n",optpath);
-
+			mmget_delete_file(cnt);
 			sprintf(update,"status-downloading/detail:%s",g_tmm_data[cnt].filename);
 			update_status("wifiMMFiles", update, NULL);
 			status_report();

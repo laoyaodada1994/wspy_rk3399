@@ -47,16 +47,16 @@ enum{
 };
 uint8_t g_curchl[IEEE80211BANDS];
 pthread_mutex_t g_tscanpolicy_mutex;//扫描策略线程互斥锁
-pthread_mutex_t g_tchl_mutex;//信道获取互斥锁
+pthread_mutex_t g_tchl_mutex[IEEE80211BANDS];//信道获取互斥锁
 pthread_mutex_t g_wlanlist_mutex;//wifi信息链表
 
 pcap_dumper_t *out_pcap[IEEE80211BANDS];//抓包文件操作符指针
 bool PcapOn[IEEE80211BANDS]= {false,false};//抓包标识
 //uint32_t PcapMsgPushTm[IEEE80211BANDS] = {0,0};
-int8_t AntennaAngle[IEEE80211BANDS] = {0,0};
+int8_t AntennaAngle=0;
 char PcapInterface[IEEE80211BANDS][WDEVNAME_LEN]={"wlan0","wlan2"};//= {"ath0","ath1"};
 static char UploadMsgBuf[IEEE80211BANDS][1024];
-struct scan_policy ScanPolicy[IEEE80211BANDS];
+struct scan_policy ScanPolicy;
 MACPACK_COUNT PacketCount[IEEE80211BANDS];
 /***********************************************************************
  *                              Function
@@ -74,7 +74,7 @@ void start_sniffer()
 	pthread_mutex_lock(&g_tscanpolicy_mutex);//上锁防止被抓包线程打断
 	memset(PcapInterface,0,sizeof(PcapInterface));
 	for(int i=0 ; i<IEEE80211BANDS;i++){
-		if(ScanPolicy[i].enable){
+		if(ScanPolicy.enable[i]){
 		//	sprintf(cbuf,"uci get wspy.wlan.dev%d",i);//获取设备名称
 			//sys_get(cbuf,PcapInterface[i],WDEVNAME_LEN);
 			strcpy(PcapInterface[i],UserCfgJson.wlan_dev[i]);
@@ -94,8 +94,9 @@ void stop_sniffer(void)
 {
 	//pthread_mutex_lock(&g_tscanpolicy_mutex);//上锁防止被抓包线程打断
 	PcapOn[IEEE80211_2G4]= PcapOn[IEEE80211_5G8]= false;
-	ScanPolicy[0].enable=0;
-	ScanPolicy[1].enable=0;
+	ScanPolicy.enable[0]=0;
+	ScanPolicy.enable[1]=0;
+	printf("%s\n",__func__);
 }
 /*****************************************************************
  * 函数描述：扫描策略解析函数，用于解析上位机传下来的策略参数
@@ -105,165 +106,108 @@ void stop_sniffer(void)
  * ***************************************************************/
 int wifi_scan_policy_parse(cJSON* root)
 {  
-    cJSON *params, *band,*band_5_8g=NULL;
+	cJSON *params, *band,*band_5_8g=NULL;
 
-    memset(ScanPolicy,0,sizeof(ScanPolicy));
-    params = cJSON_GetObjectItem(root, "params");
-    if (params == NULL) {
-        perror("scan policy config file has no params\n");
-        return -1;
-    }
+	memset(&ScanPolicy,0,sizeof(ScanPolicy));
+	params = cJSON_GetObjectItem(root, "params");
+	if (params == NULL) {
+		perror("scan policy config file has no params\n");
+		return -1;
+	}
+	cJSON * cycle = cJSON_GetObjectItem(params, "cycle");//获取角度值
+	if(cycle != NULL){
+	   ScanPolicy.cycle_period = (uint8_t)(cJSON_GetObjectItem(params, "cycle")->valueint);
+	}
 
-    band = cJSON_GetObjectItem(params, "2.4");
-    if (band != NULL) {
-        cJSON * angle = cJSON_GetObjectItem(band, "angle");
-        if (angle != NULL) {
-            ScanPolicy[0].angle.start = cJSON_GetObjectItem(angle, "start")->valuedouble;
-            if( ScanPolicy[0].angle.start <-50){//便携设备角度范围为-50到50
-            	ScanPolicy[0].angle.start = -50;
-            }
-            if(ScanPolicy[0].angle.start >50){
-            	ScanPolicy[0].angle.start = 50;
-            }
-            ScanPolicy[0].angle.end = cJSON_GetObjectItem(angle, "end")->valuedouble;
-            if( ScanPolicy[0].angle.end <-50){//便携设备角度范围为-50到50
-				ScanPolicy[0].angle.end = -50;
+	cJSON * angle = cJSON_GetObjectItem(params, "angle");//获取角度值
+	if (angle != NULL) {
+		ScanPolicy.angle.start = cJSON_GetObjectItem(angle, "start")->valuedouble;
+		if( ScanPolicy.angle.start <-50){//便携设备角度范围为-50到50
+			ScanPolicy.angle.start = -50;
+		}
+		if(ScanPolicy.angle.start >50){
+			ScanPolicy.angle.start = 50;
+		}
+		ScanPolicy.angle.end = cJSON_GetObjectItem(angle, "end")->valuedouble;
+		if( ScanPolicy.angle.end <-50){//便携设备角度范围为-50到50
+			ScanPolicy.angle.end = -50;
+		}
+		if( ScanPolicy.angle.end >50){
+			ScanPolicy.angle.end=50;
+		}
+		if(ScanPolicy.angle.end > ScanPolicy.angle.start){
+			ScanPolicy.angle.step = cJSON_GetObjectItem(angle, "step")->valuedouble;
+			if(ScanPolicy.angle.end<=0){
+				if(ScanPolicy.angle.step > (abs(ScanPolicy.angle.start)-abs(ScanPolicy.angle.end))){
+					ScanPolicy.angle.step =abs(ScanPolicy.angle.start)-abs(ScanPolicy.angle.end);
+					printf(" %s %d start step is %d\n",__func__,__LINE__,ScanPolicy.angle.step);
+				}
 			}
-            if( ScanPolicy[0].angle.end >50){
-            	ScanPolicy[0].angle.end=50;
-            }
-            if(ScanPolicy[0].angle.end > ScanPolicy[0].angle.start){
-            	ScanPolicy[0].angle.step = cJSON_GetObjectItem(angle, "step")->valuedouble;
-            	if(ScanPolicy[0].angle.end<=0){
-            		if(ScanPolicy[0].angle.step > (abs(ScanPolicy[0].angle.start)-abs(ScanPolicy[0].angle.end))){
-            			ScanPolicy[0].angle.step =abs(ScanPolicy[0].angle.start)-abs(ScanPolicy[0].angle.end);
-            			printf(" %s start step is %d\n",__func__,ScanPolicy[0].angle.step);
-            		}
-            	}
-            	else if(ScanPolicy[0].angle.start <=0){
-            		if(ScanPolicy[0].angle.step > (abs(ScanPolicy[0].angle.start)+ScanPolicy[0].angle.end)){
-            			ScanPolicy[0].angle.step =abs(ScanPolicy[0].angle.start)+ScanPolicy[0].angle.end;
-            			printf("start step is %d\n",ScanPolicy[0].angle.step);
-					}
-            		printf("start step is %d %d %d\n",ScanPolicy[0].angle.step,ScanPolicy[0].angle.start,ScanPolicy[0].angle.end);
-            	}
-            	else
-            	{
-            		if(ScanPolicy[0].angle.step > (ScanPolicy[0].angle.end-ScanPolicy[0].angle.start)){
-            			ScanPolicy[0].angle.step =ScanPolicy[0].angle.start-ScanPolicy[0].angle.end;
-            			printf(" %s start step is %d\n",__func__,ScanPolicy[0].angle.step);
-					}
-            	}
-            }
-            else {
-            	ScanPolicy[0].angle.step = -(int)(cJSON_GetObjectItem(angle, "step")->valueint);
-            	if(ScanPolicy[0].angle.start<=0){
-					if(abs(ScanPolicy[0].angle.step) > (abs(ScanPolicy[0].angle.start)-abs(ScanPolicy[0].angle.end))){
-						ScanPolicy[0].angle.step =abs(ScanPolicy[0].angle.start)-abs(ScanPolicy[0].angle.end);
-						printf(" %s start step is %d\n",__func__,ScanPolicy[0].angle.step);
-					}
+			else if(ScanPolicy.angle.start <=0){
+				if(ScanPolicy.angle.step > (abs(ScanPolicy.angle.start)+ScanPolicy.angle.end)){
+					ScanPolicy.angle.step =abs(ScanPolicy.angle.start)+ScanPolicy.angle.end;
+					printf("start step is %d\n",ScanPolicy.angle.step);
 				}
-				else if(ScanPolicy[0].angle.end <=0){
-					if(ScanPolicy[0].angle.step < (-ScanPolicy[0].angle.start+ScanPolicy[0].angle.end)){
-						ScanPolicy[0].angle.step =(-ScanPolicy[0].angle.start+ScanPolicy[0].angle.end);
-						printf(" %s start step is %d\n",__func__,ScanPolicy[0].angle.step);
-					}
+				printf("%d start step is %d %d %d\n",__LINE__,ScanPolicy.angle.step,ScanPolicy.angle.start,ScanPolicy.angle.end);
+			}
+			else
+			{
+				if(ScanPolicy.angle.step > (ScanPolicy.angle.end-ScanPolicy.angle.start)){
+					ScanPolicy.angle.step =ScanPolicy.angle.start-ScanPolicy.angle.end;
+					printf(" %s %d start step is %d\n",__func__,__LINE__,ScanPolicy.angle.step);
 				}
-				else
-				{
-					if(ScanPolicy[0].angle.step < (ScanPolicy[0].angle.end-ScanPolicy[0].angle.start)){
-						ScanPolicy[0].angle.step =ScanPolicy[0].angle.end-ScanPolicy[0].angle.start;
-						printf(" %s start step is %d\n",__func__,ScanPolicy[0].angle.step);
-					}
+			}
+		}
+		else {
+			ScanPolicy.angle.step = -(int)(cJSON_GetObjectItem(angle, "step")->valueint);
+			if(ScanPolicy.angle.start<=0){
+				if(abs(ScanPolicy.angle.step) > (abs(ScanPolicy.angle.end)-abs(ScanPolicy.angle.start))){
+					ScanPolicy.angle.step =abs(ScanPolicy.angle.start)-abs(ScanPolicy.angle.end);
+					printf(" %s %d start step is %d\n",__func__,__LINE__,ScanPolicy.angle.step);
 				}
-            }
-        }
+			}
+			else if(ScanPolicy.angle.end <=0){
+				if(ScanPolicy.angle.step < (-ScanPolicy.angle.start+ScanPolicy.angle.end)){
+					ScanPolicy.angle.step =(-ScanPolicy.angle.start+ScanPolicy.angle.end);
+					printf(" %s %d start step is %d\n",__func__,__LINE__,ScanPolicy.angle.step);
+				}
+			}
+			else{
+				if(ScanPolicy.angle.step < (ScanPolicy.angle.end-ScanPolicy.angle.start)){
+					ScanPolicy.angle.step =ScanPolicy.angle.end-ScanPolicy.angle.start;
+					printf(" %s %d start step is %d\n",__func__,__LINE__,ScanPolicy.angle.step);
+				}
+			}
+		}
+	}
+	band = cJSON_GetObjectItem(params, "2.4");
+	if (band != NULL) {
+		ScanPolicy.repeat[0] = cJSON_GetObjectItem(band, "repeat")->valueint;
+		ScanPolicy.enable[0]= true;
 
-        ScanPolicy[0].cycle_period = cJSON_GetObjectItem(band, "cycle")->valueint;
-        ScanPolicy[0].repeat = cJSON_GetObjectItem(band, "repeat")->valueint;
-        ScanPolicy[0].enable = true;
+		cJSON * channel = cJSON_GetObjectItem(band, "channel");
+		ScanPolicy.channel[0].cnt = cJSON_GetArraySize(channel);
+		for (int i=0;i<ScanPolicy.channel[0].cnt;i++) {
+			ScanPolicy.channel[0].table[i] = atoi((const char *)cJSON_GetArrayItem(channel, i)->valuestring);
+		}
+	}
+	else
+		ScanPolicy.enable[0] = false;
 
-        cJSON * channel = cJSON_GetObjectItem(band, "channel");
-        ScanPolicy[0].channel.cnt = cJSON_GetArraySize(channel);
-        for (int i=0;i<ScanPolicy[0].channel.cnt;i++) {
-            ScanPolicy[0].channel.table[i] = atoi((const char *)cJSON_GetArrayItem(channel, i)->valuestring);
-        }
-    }
-    else
-        ScanPolicy[0].enable = false;
+	band_5_8g = cJSON_GetObjectItem(params, "5.8");
+	if (band_5_8g != NULL) {
+		ScanPolicy.repeat[1] = cJSON_GetObjectItem(band_5_8g, "repeat")->valueint;
+		ScanPolicy.enable[1] = true;
 
-    band_5_8g = cJSON_GetObjectItem(params, "5.8");
-       if (band_5_8g != NULL) {
-           cJSON * angle = cJSON_GetObjectItem(band_5_8g, "angle");
-           if (angle != NULL) {
-               ScanPolicy[1].angle.start = cJSON_GetObjectItem(angle, "start")->valuedouble;
-               if( ScanPolicy[1].angle.start <-50){//便携设备角度范围为-50到50
-            	   ScanPolicy[1].angle.start = -50;
-               }
-               if( ScanPolicy[1].angle.start > 50){//便携设备角度范围为-50到50
-				   ScanPolicy[1].angle.start = 50;
-			   }
-               ScanPolicy[1].angle.end = cJSON_GetObjectItem(angle, "end")->valuedouble;
-               if( ScanPolicy[1].angle.end >50){
-            	   ScanPolicy[1].angle.end=50;
-               }
-               if( ScanPolicy[1].angle.start <-50){//便携设备角度范围为-50到50
-				   ScanPolicy[1].angle.start = -50;
-			   }
-               if(ScanPolicy[1].angle.end > ScanPolicy[1].angle.start){
-            	   ScanPolicy[1].angle.step = (int)(cJSON_GetObjectItem(angle, "step")->valueint);
-            	   if(ScanPolicy[1].angle.end<=0){
-						if(ScanPolicy[1].angle.step > (abs(ScanPolicy[1].angle.start)-abs(ScanPolicy[1].angle.end))){
-							ScanPolicy[1].angle.step =abs(ScanPolicy[1].angle.start)-abs(ScanPolicy[1].angle.end);
-						}
-					}
-					else if(ScanPolicy[1].angle.start <=0){
-						if(ScanPolicy[1].angle.step > (abs(ScanPolicy[1].angle.start)+ScanPolicy[1].angle.end)){
-							ScanPolicy[1].angle.step =abs(ScanPolicy[1].angle.start)+ScanPolicy[1].angle.end;
-						}
-					}
-					else
-					{
-						if(ScanPolicy[1].angle.step > (ScanPolicy[1].angle.end-ScanPolicy[1].angle.start)){
-							ScanPolicy[1].angle.step =ScanPolicy[1].angle.start-ScanPolicy[1].angle.end;
-						}
-					}
-               }
-               else{
-            	   ScanPolicy[1].angle.step = -(int)(cJSON_GetObjectItem(angle, "step")->valueint);
-            	   if(ScanPolicy[1].angle.start<=0){
-						if(abs(ScanPolicy[1].angle.step) > (abs(ScanPolicy[1].angle.start)-abs(ScanPolicy[1].angle.end))){
-							ScanPolicy[1].angle.step =abs(ScanPolicy[1].angle.start)-abs(ScanPolicy[1].angle.end);
-						}
-					}
-					else if(ScanPolicy[1].angle.end <=0){
-						if(ScanPolicy[1].angle.step < (-ScanPolicy[1].angle.start+ScanPolicy[1].angle.end)){
-							ScanPolicy[1].angle.step =(-ScanPolicy[1].angle.start+ScanPolicy[1].angle.end);
-						}
-					}
-					else
-					{
-						if(ScanPolicy[1].angle.step < (ScanPolicy[1].angle.end-ScanPolicy[1].angle.start)){
-							ScanPolicy[1].angle.step =ScanPolicy[1].angle.end-ScanPolicy[1].angle.start;
-						}
-					}
-               }
-           }
-
-           ScanPolicy[1].cycle_period = (uint8_t)(cJSON_GetObjectItem(band_5_8g, "cycle")->valueint);
-           ScanPolicy[1].repeat = cJSON_GetObjectItem(band_5_8g, "repeat")->valueint;
-           ScanPolicy[1].enable = true;
-
-           cJSON * channel = cJSON_GetObjectItem(band_5_8g, "channel");
-           ScanPolicy[1].channel.cnt = cJSON_GetArraySize(channel);
-           for (int i=0;i<ScanPolicy[1].channel.cnt;i++) {
-               ScanPolicy[1].channel.table[i] = atoi((const char *)cJSON_GetArrayItem(channel, i)->valuestring);
-               myprintf("ScanPolicy.band_5_8g.channel.table[%d]=%d\n",i,ScanPolicy[1].channel.table[i]);
-           }
-       }
-       else
-           ScanPolicy[1].enable = false;
-    return 0;
+		cJSON * channel = cJSON_GetObjectItem(band_5_8g, "channel");
+		ScanPolicy.channel[1].cnt = cJSON_GetArraySize(channel);
+		for (int i=0;i<ScanPolicy.channel[1].cnt;i++) {
+		   ScanPolicy.channel[1].table[i] = atoi((const char *)cJSON_GetArrayItem(channel, i)->valuestring);
+		}
+	}
+	else
+	   ScanPolicy.enable[1]= false;
+	return 0;
 }
 
 /*****************************************************************
@@ -274,39 +218,56 @@ int wifi_scan_policy_parse(cJSON* root)
  * ***************************************************************/
 void wifi_scan_policy(void *arg)
 {  
-    uint8_t ch_idx = 0,bsctrl_flag=BSCTRL_INIT;
+	uint8_t ch_idx[IEEE80211BANDS] = {0,0},bsctrl_flag=BSCTRL_INIT;
     int angle=0,step=0;
     uint32_t tick,tick_count=0;
+    uint8_t ucchl1=0,ucchl2=0,chlable[IEEE80211BANDS];
     int fix_flag=0;
     uint8_t ucchl=*((uint8_t *)arg);
     char cmdbuf[64];
+    chlable[0]=ucchl&0x1;
+	if(chlable[0] ==1){
+		ucchl1=0;
+	}
+	chlable[1]=((ucchl&IEEE80211BANDS)>>1);
+	if(chlable[1]==1){
+		ucchl2=1;
+	}
     memset(cmdbuf,0,64);
 #ifdef WSPY_CAR
     gimbal_init_set();
 #endif
-   	if(!ScanPolicy[ucchl].enable){//判断扫描策略是否使能，如果没有使能，则推出线程处理函数
+    if(!ScanPolicy.enable[0]&&!ScanPolicy.enable[1]){//判断扫描策略是否使能，如果没有使能，则推出线程处理函数
    		pthread_exit(0);
    		return ;
     }
-    step = ScanPolicy[ucchl].angle.step;
-	if (ScanPolicy[ucchl].cycle_period > 0//判断获取动态角度和变换时间
-    	    &&  ScanPolicy[ucchl].angle.start != ScanPolicy[ucchl].angle.end &&step !=0) {
+    step = ScanPolicy.angle.step;
+	if (ScanPolicy.cycle_period > 0//判断获取动态角度和变换时间
+    	    &&  ScanPolicy.angle.start != ScanPolicy.angle.end &&step !=0) {
 //    	        float range = (ScanPolicy[ucchl].angle.end - ScanPolicy[ucchl].angle.start)/step;
 //    	        float period = (float)(ScanPolicy[ucchl].cycle_period);
 //    	        tick = (int)(period / range);
 	}
     else{
-		printf("scan fix angle: %d\n", ScanPolicy[ucchl].angle.start);
+		printf("scan fix angle: %d\n", ScanPolicy.angle.start);
     	      //  gimbal_set_angle(ScanPolicy.band_2_4g.angle.start,channel);
 		fix_flag =1;//设置固定角度
 	}
-	tick = ScanPolicy[ucchl].cycle_period;//驻留时间 modify by lpz 20200819
+	tick = ScanPolicy.cycle_period;//驻留时间 modify by lpz 20200819
+	if(fix_flag ==1){
+		tick=FIX_SCAN_TIME;
+	}
 	tick_count=tick*10;
-    printf("Dev %d scan channels: %d\n",ucchl ,ScanPolicy[ucchl].channel.cnt);
-    for (int i=0;i<ScanPolicy[ucchl].channel.cnt;i++)
-        printf("%d, ", ScanPolicy[ucchl].channel.table[i]);
-    printf("\n");
-    angle=ScanPolicy[ucchl].angle.start;//获取起始角度
+	 printf("Dev %d scan channels: %d\t Dev %d scan channels: %d\n",
+	    		ucchl1 ,ScanPolicy.channel[ucchl1].cnt,
+	    		ucchl2 ,ScanPolicy.channel[ucchl2].cnt);
+	for (int i=0;i<ScanPolicy.channel[ucchl1].cnt;i++)
+		printf("%d, ", ScanPolicy.channel[ucchl1].table[i]);
+	printf("\n");
+	for (int i=0;i<ScanPolicy.channel[ucchl2].cnt;i++)
+		   printf("%d, ", ScanPolicy.channel[ucchl2].table[i]);
+	printf("\n");
+    angle=ScanPolicy.angle.start;//获取起始角度
 #ifdef WSPY_CAR
     memset(&gim_set_res,0,sizeof(gim_set_res));
     if(angle<-2||angle >2){
@@ -316,50 +277,62 @@ void wifi_scan_policy(void *arg)
 		gim_set_res.setflag=1;
     }
 #else
-    gimbal_set_angle(angle,ScanPolicy[ucchl].channel.table[ch_idx]);//，如果是便携，则先设置一次角度和信道
+    for(int i=0;i<IEEE80211BANDS;i++){
+		if(chlable[i]){
+			gimbal_set_angle(angle,ScanPolicy.channel[i].table[ch_idx[i]]);//，如果是便携，则先设置一次角度和信道
+		}
+	}
 //    gimbal_set_angle(angle);
 #endif
-    sprintf(cmdbuf,"iwconfig %s channel %d",PcapInterface[ucchl],ScanPolicy[ucchl].channel.table[ch_idx]);//控制网卡信道切换
-    printf("        buf %s angle %d step %d\n",cmdbuf,angle,step);
-    system(cmdbuf);
-    pthread_mutex_lock(&g_tchl_mutex);//上锁防止被抓包线程打断
-    g_curchl[ucchl]=ScanPolicy[ucchl].channel.table[ch_idx];
-    pthread_mutex_unlock(&g_tchl_mutex);//上锁防止被抓包线程打断
-    if(ScanPolicy[ucchl].channel.cnt <= 1&&fix_flag ==1){
-	    pthread_exit(0);
-    	return ;
+
+
+    for(int i=0;i<IEEE80211BANDS;i++){
+       	if(chlable[i]){
+   			sprintf(cmdbuf,"iwconfig %s channel %d",PcapInterface[i],ScanPolicy.channel[i].table[ch_idx[i]]);//控制网卡信道切换
+   			printf("        buf %s angle %d step %d\n",cmdbuf,angle,step);
+   			system(cmdbuf);
+   			pthread_mutex_lock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
+   			g_curchl[i]=ScanPolicy.channel[i].table[ch_idx[i]];
+   			pthread_mutex_unlock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
+       	}
     }
+//    if(ScanPolicy[ucchl].channel.cnt <= 1&&fix_flag ==1){
+//	    pthread_exit(0);
+//    	return ;
+//    }
     printf("start capture policy\n");
-    while (PcapOn[ucchl] == true&&DecryptOn == false) {
-        uint8_t channel = ScanPolicy[ucchl].channel.table[ch_idx];
+    while ((PcapOn[ucchl1] == true||PcapOn[ucchl2] == true)&&DecryptOn == false) {
+    	uint8_t channel[IEEE80211BANDS] ;
+		channel[ucchl1]= ScanPolicy.channel[ucchl1].table[ch_idx[ucchl1]];
+		channel[ucchl2]= ScanPolicy.channel[ucchl2].table[ch_idx[ucchl2]];
         angle += step;
-        if ((ScanPolicy[ucchl].enable )&& (ScanPolicy[ucchl].angle.step!=0)) { //动态切换角度和信号
-        	if(ScanPolicy[ucchl].angle.end >ScanPolicy[ucchl].angle.start){
-				if (angle >= ScanPolicy[ucchl].angle.end) {
-					angle = ScanPolicy[ucchl].angle.end;
-					step  = -ScanPolicy[ucchl].angle.step;
+        if ( ScanPolicy.angle.step!=0) {  //动态切换角度和信号
+        	if(ScanPolicy.angle.end >ScanPolicy.angle.start){
+				if (angle >= ScanPolicy.angle.end) {
+					angle = ScanPolicy.angle.end;
+					step  = -ScanPolicy.angle.step;
 					bsctrl_flag = BSCTRL_SETCHL;//设置为切信道的状态
 				}
-				else if (angle <= ScanPolicy[ucchl].angle.start) {
-					angle = ScanPolicy[ucchl].angle.start;
-					step = ScanPolicy[ucchl].angle.step;
+				else if (angle <= ScanPolicy.angle.start) {
+					angle = ScanPolicy.angle.start;
+					step = ScanPolicy.angle.step;
 					bsctrl_flag = (bsctrl_flag ==BSCTRL_INIT)?BSCTRL_SETANG:BSCTRL_SETCHL;
 				}
         	}
         	else
         	{
-        		if (angle <= ScanPolicy[ucchl].angle.end) {
-        			angle = ScanPolicy[ucchl].angle.end;
-					step  = -ScanPolicy[ucchl].angle.step;
+        		if (angle <= ScanPolicy.angle.end) {
+        			angle = ScanPolicy.angle.end;
+					step  = -ScanPolicy.angle.step;
 					bsctrl_flag = BSCTRL_SETCHL;//设置为切信道的状态
         		}
-        		else if (angle >= ScanPolicy[ucchl].angle.start) {
-        			angle = ScanPolicy[ucchl].angle.start;
-					step = ScanPolicy[ucchl].angle.step;
+        		else if (angle >= ScanPolicy.angle.start) {
+        			angle = ScanPolicy.angle.start;
+					step = ScanPolicy.angle.step;
 					bsctrl_flag = (bsctrl_flag ==BSCTRL_INIT)?BSCTRL_SETANG:BSCTRL_SETCHL;
         		}
         	}
-			AntennaAngle[ucchl]=angle;
+			AntennaAngle=angle;
 #ifdef WSPY_CAR
 			gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,tick_count,100);
 			gim_set_res.recflag=0;
@@ -373,7 +346,11 @@ void wifi_scan_policy(void *arg)
 #else
 
 			sleep(tick);//
-			gimbal_set_angle(angle,channel);
+			for(int i=0;i<IEEE80211BANDS;i++){
+				if(chlable[i]){
+					gimbal_set_angle(angle,channel[i]);
+					}
+			}
 #endif
 
 			if(bsctrl_flag !=BSCTRL_SETCHL){//如果没有扫到一圈，则继续切角度
@@ -384,27 +361,37 @@ void wifi_scan_policy(void *arg)
 				bsctrl_flag =BSCTRL_SETANG;
 			}
         }
-        else if(ScanPolicy[ucchl].enable &&fix_flag ==1){//向波控固定角度，定时切换信道
+        else if(fix_flag ==1){//向波控固定角度，定时切换信道
         	//if (channel > 0 && channel < 15) {
-			AntennaAngle[ucchl]=ScanPolicy[ucchl].angle.start;
+			AntennaAngle=ScanPolicy.angle.start;
 #ifdef WSPY_CAR
-			gimbal_set_angle(ScanPolicy[ucchl].angle.start);
+			gimbal_set_angle(ScanPolicy.angle.start);
 #else
-			gimbal_set_angle(ScanPolicy[ucchl].angle.start,channel);
+			for(int i=0;i<IEEE80211BANDS;i++){
+				if(chlable[i]){
+					gimbal_set_angle(ScanPolicy.angle.start,channel[i]);
+					printf("set fix angle %d chnanel %d\n",ScanPolicy.angle.start,channel[i]);
+				}
+				printf("chlable %d %d\n",chlable[0],chlable[1]);
+			}
 #endif
         	//}
 			sleep(tick);
         }
-        ch_idx++;
-		if (ch_idx >= ScanPolicy[ucchl].channel.cnt){
-			ch_idx=0;
+        for(int i=0;i<IEEE80211BANDS;i++){
+			if(chlable[i]){
+				ch_idx[i]++;
+				if (ch_idx[i] >= ScanPolicy.channel[i].cnt){
+					ch_idx[i]=0;
+				}
+				pthread_mutex_lock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
+				g_curchl[i]=channel[i] =  ScanPolicy.channel[i].table[ch_idx[i]];
+				pthread_mutex_unlock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
+				sprintf(cmdbuf,"iwconfig %s channel %d",PcapInterface[i],channel[i]);//控制网卡信道切换
+				system(cmdbuf);
+				printf("scan channel : %d\n", channel[i]);
+			}
 		}
-		pthread_mutex_lock(&g_tchl_mutex);//上锁防止被抓包线程打断
-		g_curchl[ucchl]=channel =  ScanPolicy[ucchl].channel.table[ch_idx];
-	    pthread_mutex_unlock(&g_tchl_mutex);//上锁防止被抓包线程打断
-		sprintf(cmdbuf,"iwconfig %s channel %d",PcapInterface[ucchl],channel);//控制网卡信道切换
-		system(cmdbuf);
-		printf("scan channel: %d\n", channel);
     }
 	printf("%s exit\n",__func__);
     pthread_exit(0);
@@ -590,7 +577,7 @@ int tag_parse(uint8_t *pdata,uint16_t ulen,mac_link_info_t *plinkinfo, uint8_t u
  * 参数：char * buffer格式化后的数据缓存
  * 		const uint8_t ** bssid 获取的BSSID
  * 		const uint8_t ** src 	源mac地址
- *		const uint8_t ** dst	目的mac地址
+ *		const uint8_t *dst	目的mac地址
  * 		const mac_link_info_t * info 格式化前的数据缓存
  * 		uint16_t uscaplen	抓取数据包
  * 		uint8_t	 ucchl		通道号
@@ -599,7 +586,7 @@ int tag_parse(uint8_t *pdata,uint16_t ulen,mac_link_info_t *plinkinfo, uint8_t u
 int mac80211_addr_parse( mac80211_pkt_t * packet,
                        const uint8_t ** bssid,
                        const uint8_t ** src,
-                       const uint8_t ** dst,
+					   const uint8_t ** dst,
                        mac80211_element_t ** ssid,
                        mac_link_info_t *plinkinfo,
                        uint16_t uscaplen,
@@ -655,7 +642,7 @@ int mac80211_addr_parse( mac80211_pkt_t * packet,
     case 0x01:   //To DS:1, From DS:0
         *bssid = packet->Address1;
         *src = packet->Address2;
-        *dst  =dst_tmp= packet->Address3;
+        *dst =dst_tmp= packet->Address3;
         break;
     case 0x02:   //To DS:0, From DS:1
         *bssid = packet->Address2;
@@ -667,8 +654,8 @@ int mac80211_addr_parse( mac80211_pkt_t * packet,
     	return -1;
     	break;
     }
-    if(buse ==1||(dst_tmp[0] &0x1) == 0x1){
-    	memset(dst_tmp,0xff,6);//将应答帧的目的地址改为广播，避免上位机处理这些信息
+    if(buse ==1&&(dst_tmp[0] &0x1) == 0x1){
+    	memset(dst_tmp,0xff,6);//将应答帧的目的地址改为广播，避免上位机处理组播信息
     }
 #endif
     return 0;
@@ -735,14 +722,15 @@ static int format(char * buffer, const mac_link_info_t * info,uint8_t ucchl)
     }
 //    printf("\n");
 
-
+    sprintf(tmp, "\"fctype\":%d,", info->Type);//modify by lpz 20201211 增加帧类型字段
+	strcat(buffer, tmp);
     sprintf(tmp, "\"rssi\":%d,", info->rssi);
     strcat(buffer, tmp);
     sprintf(tmp, "\"freq\":%d,", info->frequency);
     strcat(buffer, tmp);
     sprintf(tmp, "\"channel\":%d,", info->workchl);//信道
     strcat(buffer, tmp);
-    sprintf(tmp, "\"angle\":%d,", AntennaAngle[ucchl]);
+    sprintf(tmp, "\"angle\":%d,", AntennaAngle);
     strcat(buffer, tmp);
 
     sprintf(tmp,"\"hwmode\":\"");
@@ -834,7 +822,7 @@ static int format(char * buffer, const mac_link_info_t * info,uint8_t ucchl)
     }
     strcat(buffer, tmp);
     strcat(buffer, "}");
-    //printf("ssid buf :%s\n",buffer);
+    printf("ssid buf :%s\n",buffer);
     return strlen(buffer);
 }
 
@@ -887,6 +875,7 @@ void sniffer_msg_push(uint32_t timeout,uint8_t ucchl)
 ****************************************************************/
 void radio_message_get(struct ieee80211_radiotap_iterator *iter,radiotap_data_t * pradio_data)
 {
+	int8_t tmp_signal=0;
 	switch (iter->this_arg_index) {
 		case IEEE80211_RADIOTAP_TSFT:
 			pradio_data->timestamp= le32toh(((uint32_t *)iter->this_arg)[0]);
@@ -906,8 +895,10 @@ void radio_message_get(struct ieee80211_radiotap_iterator *iter,radiotap_data_t 
 		//	printf("freq: %d", pradio_data->frequency);
 			break;
 		case IEEE80211_RADIOTAP_DBM_ANTSIGNAL:
-			pradio_data->signal = *iter->this_arg;
-		//	printf("signal: %d", pradio_data->signal);
+			tmp_signal=*iter->this_arg;
+			if(pradio_data->signal > tmp_signal){//modify by lpz 20201129 取最小值
+				pradio_data->signal = tmp_signal;
+			}
 			break;
 		default:
 			break;
@@ -942,11 +933,12 @@ void parse_packet(uint8_t * arg, const struct pcap_pkthdr * pkthdr, const uint8_
     const uint8_t * bssid, * src, * dst;
     mac_link_info_t link_info; 
     memset(&link_info,0,sizeof(link_info));
+    memset(&t_radio_tata,0,sizeof(t_radio_tata));
     ssid = NULL;
     bssid = src = dst = NULL;
     res=ieee80211_radiotap_iterator_init(&iter, (struct ieee80211_radiotap_header *)packet, radiotap->it_len, NULL);
     if (res) {
-		printf("malformed radiotap header (init returns %d)\n", res);
+		printf("malformed radiotap header (init returns %d) %d\n", res,packet[0]);
 		return ;
 	}
     while (!(res = ieee80211_radiotap_iterator_next(&iter))) {
@@ -1012,7 +1004,12 @@ void parse_packet(uint8_t * arg, const struct pcap_pkthdr * pkthdr, const uint8_
     }
     link_info.timestamp = t_radio_tata.timestamp;
     link_info.frequency = t_radio_tata.frequency;
-    link_info.rssi = t_radio_tata.signal;
+    if(t_radio_tata.signal >0){  //modify by lpz 20201119去掉大于0的信号强度
+    	link_info.rssi=-t_radio_tata.signal;
+    }
+    else{
+    	link_info.rssi = t_radio_tata.signal;
+    }
     link_info.Type = mac80211->Type;
    //printf("%s %d frq %d  time %d\n",__func__,__LINE__,t_radio_tata.frequency,link_info.timestamp);
    if (DecryptOn == false){ //未开启握手包抓取
@@ -1070,6 +1067,7 @@ void capture_loop(void *arg)
     {
     	pcap_loop(handle, 100, parse_packet, (u_char *)arg);//设置每抓100个包，产生回调
     	//pcap_dump_flush(out_pcap[ucchl]);
+    	printf("caputer loop  %d %d \n",PcapOn[ucchl],ucchl);
     }
 //    pcap_close(handle);
 //    pcap_dump_close(out_pcap[ucchl]);

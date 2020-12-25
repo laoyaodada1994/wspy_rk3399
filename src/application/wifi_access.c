@@ -92,7 +92,8 @@ int  ap_acess_report()
 int  sta_acess_report(int sockfd)
 {
 	char cmdbuf[128];
-	char ip[32];
+	char tmp_ip[32],tmp_gw[32];
+	char *pip=NULL,*pgw=NULL;
 #if 0
 	 char iwinfo[256];
 	 char cmdinfo[128];
@@ -127,15 +128,43 @@ int  sta_acess_report(int sockfd)
 		 printf("ioctl  error :%s\n",strerror(err));
 		 return 1;
 	 }
+	 struct in_addr localip;
+	 memcpy(&localip,&(((struct sockaddr_in *)&ifr.ifr_ifru.ifru_addr)->sin_addr),sizeof(struct in_addr));
+	 printf("%#04x %s \n",localip.s_addr,inet_ntoa(localip));
+	 if((localip.s_addr&0xff) == 0xa9){
+		 printf("%#04x \n",localip.s_addr);
+		 return 1;
+	 }
+	 strcpy(tmp_ip,UserCfgJson.ip);
+	 strcpy(tmp_gw,default_gw_ip);
 
+	 strtok(tmp_ip,".");
+	 pip=strtok(NULL,".");
+	 pip=strtok(NULL,".");
 
-	 memset(cmdbuf,0,sizeof(cmdbuf));
-	 sprintf(cmdbuf,"route add -host %s gw %s",UserCfgJson.ip,default_gw_ip);
-	 printf("%s\n",cmdbuf);
-	 system(cmdbuf);
+	 printf("%s\n",pip);
+	 strtok(tmp_gw,".");
+	 pgw=strtok(NULL,".");
+	 pgw=strtok(NULL,".");
 
+	 printf("%s %s\n",pip,pgw);
+
+	 if((pip!=NULL)&&(pgw!=NULL)&&(strcmp(pip,pgw) )== 0){
+		 printf("equal %s %s\n",pip,pgw);
+	 }
+	 else{
+		 memset(cmdbuf,0,sizeof(cmdbuf));
+		 sprintf(cmdbuf,"route add -host %s gw %s",UserCfgJson.ip,default_gw_ip);
+		 printf("%s\n",cmdbuf);
+		 system(cmdbuf);
+	 }
 	 memcpy(&sin,&ifr.ifr_addr,sizeof(sin));
 	 printf("ip %s\n",inet_ntoa(sin.sin_addr));
+
+	 memset(cmdbuf,0,sizeof(cmdbuf));
+	 sprintf(cmdbuf,"route del default gw %s",default_gw_ip);
+	 printf("%s\n",cmdbuf);
+	 system(cmdbuf);
 	 return 0;
 #endif
 }
@@ -172,10 +201,10 @@ void wifi_stop_acess()
 		system(cmd);
 	}
 #endif
-	memset(cmd,0,sizeof(cmd));
-	sprintf(cmd,"route add default gw %s",default_gw_ip);
-	printf("%s\n",cmd);
-	system(cmd);
+//	memset(cmd,0,sizeof(cmd));
+//	sprintf(cmd,"route add default gw %s",default_gw_ip);
+//	printf("%s\n",cmd);
+//	system(cmd);
 	WifiAccess.mode=ACCESS_MODE_INVALID;
 }
 /*****************************************************************

@@ -122,7 +122,7 @@ void *send_deauth(uint8_t * bssid,uint8_t ucchl,uint8_t ucworkchl)
 {
 	char cmd[128], cbuf[200],cdev[20],cwchl[20];
 
-	strcpy(cdev,UserCfgJson.wlan_dev[ucchl+2]);
+	strcpy(cdev,UserCfgJson.wlan_dev[ucchl+1]);
 	memset(cbuf,0,sizeof(cbuf));
 	snprintf(cbuf, sizeof(cbuf),"iwlist %s channel|grep \"(\"|awk \'{print $5}\'|awk -F\')\' \'{print $1}\'", cdev);
 	printf("%s\n",cbuf);

@@ -279,8 +279,10 @@ void gps_report(void)
     	printf("conf parse error\n");
     }
 	if (UserCfgJson.gps_disable == 1) {
-		cJSON_AddStringToObject(root, LONGITUDE, "103.916529");//"103.916529")南京"118.792156";
-		cJSON_AddStringToObject(root, LATITUDE, "30.763128");//"30.763128");南京"30.763128"
+		sprintf(cgpsbuf,"%f",UserCfgJson.longitude);
+		cJSON_AddStringToObject(root, LONGITUDE, cgpsbuf);//"103.916529")南京"118.792156";
+		sprintf(cgpsbuf,"%f",UserCfgJson.latitude);
+		cJSON_AddStringToObject(root, LATITUDE, cgpsbuf);//"30.763128");南京"30.763128"
 	}
 	else {
 		pthread_mutex_lock(&gps_staus_mutex);

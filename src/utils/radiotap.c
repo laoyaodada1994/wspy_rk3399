@@ -86,7 +86,7 @@ static const struct ieee80211_radiotap_namespace radiotap_ns = {
  *
  * Example code: parse.c
  */
-
+#include <stdio.h>
 int ieee80211_radiotap_iterator_init(
 	struct ieee80211_radiotap_iterator *iterator,
 	struct ieee80211_radiotap_header *radiotap_header,
@@ -94,16 +94,22 @@ int ieee80211_radiotap_iterator_init(
 {
 	/* must at least have the radiotap header */
 	if (max_length < (int)sizeof(struct ieee80211_radiotap_header))
+	{
+		printf("%s %d \n",__func__,__LINE__);
 		return -EINVAL;
-
+	}
 	/* Linux only supports version 0 radiotap format */
 	if (radiotap_header->it_version)
+	{
+		printf("%s %d \n",__func__,__LINE__);
 		return -EINVAL;
-
+	}
 	/* sanity check for allowed length and radiotap length field */
 	if (max_length < get_unaligned_le16(&radiotap_header->it_len))
+	{
+		printf("%s %d \n",__func__,__LINE__);
 		return -EINVAL;
-
+	}
 	iterator->_rtheader = radiotap_header;
 	iterator->_max_length = get_unaligned_le16(&radiotap_header->it_len);
 	iterator->_arg_index = 0;
