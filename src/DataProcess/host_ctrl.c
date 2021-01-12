@@ -307,6 +307,12 @@ int topic_controldown_handle(cJSON * root)
         ssh_close();
         cJSON_AddStringToObject(resp, "error", "none");
     }
+    else if (!strcmp(type->valuestring, "selfDestroy")) { //自毁指令 20201231
+    	set_destroy_flag();
+    	printf("do selfDestroy\n");
+		cJSON_AddStringToObject(resp, "error", "none");
+	}
+    printf("do selfDestroy2\n");
 msg_resp:
 	pdata = cJSON_Print(resp);
     mqtt_publish_msg(MQTT_TOPIC_CONTROLUP,(uint8_t *)pdata,strlen(pdata) );

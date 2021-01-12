@@ -254,7 +254,7 @@ void wifi_scan_policy(void *arg)
 		fix_flag =1;//设置固定角度
 	}
 	tick = ScanPolicy.cycle_period;//驻留时间 modify by lpz 20200819
-	if(fix_flag ==1){
+	if(tick == 0){
 		tick=FIX_SCAN_TIME;
 	}
 	tick_count=tick*10;
@@ -275,6 +275,7 @@ void wifi_scan_policy(void *arg)
 		gim_set_res.angle = angle+180;
 		gimbal_set_angle((float)angle); //如果是车载，则设置转台角度
 		gim_set_res.setflag=1;
+		gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,ZT_MAX_SCANTIME,1000);
     }
 #else
     for(int i=0;i<IEEE80211BANDS;i++){
@@ -292,7 +293,7 @@ void wifi_scan_policy(void *arg)
    			printf("        buf %s angle %d step %d\n",cmdbuf,angle,step);
    			system(cmdbuf);
    			pthread_mutex_lock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
-   			g_curchl[i]=ScanPolicy.channel[i].table[ch_idx[i]];
+   			g_curchl[i]=ScanPolicy.channel[i].table[ch_idx[i]++];
    			pthread_mutex_unlock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
        	}
     }
@@ -301,97 +302,97 @@ void wifi_scan_policy(void *arg)
 //    	return ;
 //    }
     printf("start capture policy\n");
+    uint8_t channel[IEEE80211BANDS] ;
+    bsctrl_flag=BSCTRL_SETCHL;//初始化为信号控制
     while ((PcapOn[ucchl1] == true||PcapOn[ucchl2] == true)&&DecryptOn == false) {
-    	uint8_t channel[IEEE80211BANDS] ;
-		channel[ucchl1]= ScanPolicy.channel[ucchl1].table[ch_idx[ucchl1]];
-		channel[ucchl2]= ScanPolicy.channel[ucchl2].table[ch_idx[ucchl2]];
-        angle += step;
-        if ( ScanPolicy.angle.step!=0) {  //动态切换角度和信号
-        	if(ScanPolicy.angle.end >ScanPolicy.angle.start){
-				if (angle >= ScanPolicy.angle.end) {
-					angle = ScanPolicy.angle.end;
-					step  = -ScanPolicy.angle.step;
-					bsctrl_flag = BSCTRL_SETCHL;//设置为切信道的状态
-				}
-				else if (angle <= ScanPolicy.angle.start) {
-					angle = ScanPolicy.angle.start;
-					step = ScanPolicy.angle.step;
-					bsctrl_flag = (bsctrl_flag ==BSCTRL_INIT)?BSCTRL_SETANG:BSCTRL_SETCHL;
-				}
-        	}
-        	else
-        	{
-        		if (angle <= ScanPolicy.angle.end) {
-        			angle = ScanPolicy.angle.end;
-					step  = -ScanPolicy.angle.step;
-					bsctrl_flag = BSCTRL_SETCHL;//设置为切信道的状态
-        		}
-        		else if (angle >= ScanPolicy.angle.start) {
-        			angle = ScanPolicy.angle.start;
-					step = ScanPolicy.angle.step;
-					bsctrl_flag = (bsctrl_flag ==BSCTRL_INIT)?BSCTRL_SETANG:BSCTRL_SETCHL;
-        		}
-        	}
-			AntennaAngle=angle;
-#ifdef WSPY_CAR
-			gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,tick_count,100);
-			gim_set_res.recflag=0;
-			gim_set_res.settype=GIMBAL_FRAME_TYPE_QUERY;
-			gim_set_res.angle =angle+180;
-			sleep(tick);
-			gimbal_set_angle((float)angle);
-			usleep(20000);
-			gim_set_res.setflag=1;
-
-#else
-
-			sleep(tick);//
-			for(int i=0;i<IEEE80211BANDS;i++){
-				if(chlable[i]){
-					gimbal_set_angle(angle,channel[i]);
-					}
-			}
-#endif
-
-			if(bsctrl_flag !=BSCTRL_SETCHL){//如果没有扫到一圈，则继续切角度
-				continue;
-			}
-			else
-			{
-				bsctrl_flag =BSCTRL_SETANG;
-			}
-        }
-        else if(fix_flag ==1){//向波控固定角度，定时切换信道
-        	//if (channel > 0 && channel < 15) {
-			AntennaAngle=ScanPolicy.angle.start;
-#ifdef WSPY_CAR
-			gimbal_set_angle(ScanPolicy.angle.start);
-#else
-			for(int i=0;i<IEEE80211BANDS;i++){
-				if(chlable[i]){
-					gimbal_set_angle(ScanPolicy.angle.start,channel[i]);
-					printf("set fix angle %d chnanel %d\n",ScanPolicy.angle.start,channel[i]);
-				}
-				printf("chlable %d %d\n",chlable[0],chlable[1]);
-			}
-#endif
-        	//}
-			sleep(tick);
-        }
-        for(int i=0;i<IEEE80211BANDS;i++){
+//    	channel[ucchl1]= ScanPolicy.channel[ucchl1].table[ch_idx[ucchl1]];
+//		channel[ucchl2]= ScanPolicy.channel[ucchl2].table[ch_idx[ucchl2]];
+		for(int i=0;i<IEEE80211BANDS;i++){
 			if(chlable[i]){
-				ch_idx[i]++;
-				if (ch_idx[i] >= ScanPolicy.channel[i].cnt){
+				if ((ch_idx[i] != 0 &&bsctrl_flag == BSCTRL_SETCHL)&&ch_idx[i] >= ScanPolicy.channel[i].cnt){
 					ch_idx[i]=0;
+					printf("channel aready set \n");
+					continue;
 				}
+				sleep(tick);//延时信道时间
 				pthread_mutex_lock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
-				g_curchl[i]=channel[i] =  ScanPolicy.channel[i].table[ch_idx[i]];
+				g_curchl[i]=channel[i] =  ScanPolicy.channel[i].table[ch_idx[i]++];
 				pthread_mutex_unlock(&g_tchl_mutex[i]);//上锁防止被抓包线程打断
 				sprintf(cmdbuf,"iwconfig %s channel %d",PcapInterface[i],channel[i]);//控制网卡信道切换
 				system(cmdbuf);
 				printf("scan channel : %d\n", channel[i]);
+#ifndef WSPY_CAR
+				gimbal_set_angle(angle,channel[i]);
+#endif
 			}
 		}
+		if(ch_idx[IEEE80211_2G4] == 0 &&ch_idx[IEEE80211_5G8] ==0){ //两个频段信道均扫描完成
+			bsctrl_flag = BSCTRL_SETANG;//切换角度
+		}
+        if(bsctrl_flag ==BSCTRL_SETANG){
+        	angle += step;
+        	if ( ScanPolicy.angle.step!=0) {  //动态切换角度和信号
+				if(ScanPolicy.angle.end >ScanPolicy.angle.start){
+					if (angle >= ScanPolicy.angle.end) {
+						angle = ScanPolicy.angle.end;
+						step  = -ScanPolicy.angle.step;
+					}
+					else if (angle <= ScanPolicy.angle.start) {
+						angle = ScanPolicy.angle.start;
+						step = ScanPolicy.angle.step;
+					}
+				}
+				else
+				{
+					if (angle <= ScanPolicy.angle.end) {
+						angle = ScanPolicy.angle.end;
+						step  = -ScanPolicy.angle.step;
+					}
+					else if (angle >= ScanPolicy.angle.start) {
+						angle = ScanPolicy.angle.start;
+						step = ScanPolicy.angle.step;
+					}
+				}
+				AntennaAngle=angle;
+#ifdef WSPY_CAR
+				gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,tick_count,100);
+				gim_set_res.recflag=0;
+				gim_set_res.settype=GIMBAL_FRAME_TYPE_QUERY;
+				gim_set_res.angle =angle+180;
+				gimbal_set_angle((float)angle);
+				usleep(20000);
+				gim_set_res.setflag=1;
+				gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,ZT_MAX_SCANTIME,1000);
+
+#else
+
+				for(int i=0;i<IEEE80211BANDS;i++){
+					if(chlable[i]){
+						gimbal_set_angle(angle,channel[i]);
+						printf("turn set angle %d channel %d\n",angle,channel[i]);
+					}
+				}
+#endif
+
+        	}
+        	else if(fix_flag ==1){//向波控固定角度，定时切换信道
+        	//if (channel > 0 && channel < 15) {
+        		AntennaAngle=ScanPolicy.angle.start;
+#ifdef WSPY_CAR
+        		gimbal_set_angle(ScanPolicy.angle.start);
+#else
+        		for(int i=0;i<IEEE80211BANDS;i++){
+        			if(chlable[i]){
+        				gimbal_set_angle(ScanPolicy.angle.start,channel[i]);
+        				printf("set fix angle %d chnanel %d\n",ScanPolicy.angle.start,channel[i]);
+        			}
+        			printf("chlable %d %d\n",chlable[0],chlable[1]);
+        		}
+        		usleep(100000);//延时100ms，避免设置到信道设置阶段再次设置
+#endif
+        	}
+        	bsctrl_flag =BSCTRL_SETCHL;
+        }
     }
 	printf("%s exit\n",__func__);
     pthread_exit(0);

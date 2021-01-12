@@ -446,3 +446,12 @@ void ssh_open(void)
 	system("/etc/init.d/dropbear enable");
 	system("/etc/init.d/dropbear start");
 }
+/*****************************************************************
+* 函数描述：设置自毁标志,向指定文件写入自毁标志
+* 参数：	无
+* 返回值：无
+****************************************************************/
+void set_destroy_flag(void)
+{
+	system("echo 1 > /root/wspy/reset_flag");
+}

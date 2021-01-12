@@ -151,7 +151,7 @@ int wifi_decrypt_policy_parse(cJSON* param)
 	if ((mac == NULL) || (protocol == NULL)||encryption == NULL){
 		return -1;
 	}
-
+	wifi_decrypt_setchl(ucchl);//设置握手包的信道
 //	sprintf(cbuf,"uci get wspy.wlan.dev%d",ucchl);//获取设备名称
 //	sys_get(cbuf,PcapInterface[ucchl],WDEVNAME_LEN);
 	//printf("%s %d chl %d dev %s\n",__func__,__LINE__,ucchl,);

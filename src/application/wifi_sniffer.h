@@ -16,7 +16,7 @@
 
 #define MAX_ANGLE	50  //最大探测角度
 #define MIN_ANGLE 	-50	//最小探测角度
-#define FIX_SCAN_TIME	2//固定角度扫描时间 20201124 modify by lpz
+#define FIX_SCAN_TIME	1//固定角度扫描时间 20201124 modify by lpz
 extern bool PcapOn[];
 extern pthread_mutex_t g_tscanpolicy_mutex;
 extern pthread_mutex_t g_tchl_mutex[];
@@ -152,6 +152,9 @@ typedef enum{
 	MACINFO_DATA
 }MACINFOENUM;
 
+
+
+#define ZT_MAX_SCANTIME 30 //转台最大转动时间30s
 #ifdef WSPY_CAR
 #define MIN_SCAN_PERIOD 4
 #else
