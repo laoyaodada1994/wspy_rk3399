@@ -1018,7 +1018,11 @@ void parse_packet(uint8_t * arg, const struct pcap_pkthdr * pkthdr, const uint8_
     	   wlan_list_add_info(&link_info,ucchl);
     	 //  pthread_mutex_unlock(&g_wlanlist_mutex);
 	} else if (DecryptOn == true){ //握手包抓取
-           do_wifi_decypt(pkthdr,packet,link_info.bssid,link_info.src,link_info.dst);
+		if(WifiDecrypt.encrypt ==STD_WEP){
+			do_wifi_wep_decypt(pkthdr,packet,link_info.bssid,link_info.src,link_info.dst);
+		}else{
+			do_wifi_decypt(pkthdr,packet,link_info.bssid,link_info.src,link_info.dst);
+		}
 	}
    // pcap_dump((u_char *)(out_pcap[ucchl]),pkthdr,packet);
 }
@@ -1068,7 +1072,7 @@ void capture_loop(void *arg)
     {
     	pcap_loop(handle, 100, parse_packet, (u_char *)arg);//设置每抓100个包，产生回调
     	//pcap_dump_flush(out_pcap[ucchl]);
-    	printf("caputer loop  %d %d \n",PcapOn[ucchl],ucchl);
+    	//printf("caputer loop  %d %d \n",PcapOn[ucchl],ucchl);
     }
 //    pcap_close(handle);
 //    pcap_dump_close(out_pcap[ucchl]);

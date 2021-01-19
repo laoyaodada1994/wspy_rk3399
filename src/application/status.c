@@ -348,9 +348,9 @@ void status_report(void)
 * 		uint16_t data_len 数据缓存长度
 * 返回值： 无
 * ***************************************************************/
-void trans_file( uint8_t *data, uint16_t data_len)
+void trans_file( uint8_t *data, uint32_t data_len)
 {
-	if ((data == NULL) && (data_len > 5000))
+	if (data == NULL)
 		return;
 	mqtt_publish_msg("decrypt", data, data_len);
 }

