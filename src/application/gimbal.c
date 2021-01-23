@@ -459,7 +459,7 @@ void gimbal_init()
 		return ;
 	}
 #else
-	gim_fd =serial_open("/dev/ttyHS0", 9600, 8, 1, 'N',1);
+	gim_fd =serial_open("/dev/ttyS0", 9600, 8, 1, 'N',1);
 #endif
     printf("gimbal fd :%d\n",gim_fd);
 }
@@ -516,15 +516,16 @@ void gimbal_init_set()
 ****************************************************************/
 void *gimbal_thread(void *argv)
 {
-	int retval=0,readsize=0,alread=0;
+	int retval=0,readsize=0,alread=0,packetlen=0;
 	fd_set read_fds;
 	gimbal_packet_t *read_packet=NULL;
 	struct timeval tv;
 	uint8_t readbuf[128];
 	serial_flush(gim_fd);
 	while(1){
-		alread=0;
+		memset(readbuf,0,sizeof(readbuf));
 		readsize=0;
+		alread=9;
 		tv.tv_sec = 10;
 		tv.tv_usec=0;
 		FD_ZERO(&read_fds);
@@ -542,89 +543,71 @@ void *gimbal_thread(void *argv)
 			if(FD_ISSET(gim_fd,&read_fds))
 			{
 #if 1
-				readsize=read(gim_fd, readbuf, 128);
+				readsize=read(gim_fd, readbuf, 9);
 				if(readsize <0){
 					close(gim_fd);
 					FD_CLR(gim_fd,&read_fds);
 					printf("recv error:\n");
 					break;
 				}
-				while(readsize){
-					if(readsize <9){
-						printf("read size not \n");
-						break;
+				if(readsize !=9){
+					for(int i=0;i<readsize;i++){
+						printf("%#02x,",read_packet->buffer[i]);
 					}
-					read_packet=(gimbal_packet_t *)(readbuf+alread);
-					if(read_packet->head !=GIMBAL_FRAME_HEAD){
-						printf("head error \n");
-						for(int i=0;i<9;i++){
-							printf("%#02x,",read_packet->buffer[i]);
-						}
-						break;
+					printf("\n");
+					printf("read size not enough %d\n",readsize);
+					continue;
+				}
+				read_packet=(gimbal_packet_t *)(readbuf);
+				if(read_packet->head !=GIMBAL_FRAME_HEAD){
+					printf("head error \n");
+					for(int i=0;i<9;i++){
+						printf("%#02x,",read_packet->buffer[i]);
 					}
-					if(read_packet->length > 0x23){
-						printf("body size error \n");
-						break;
-					}
-					gimabl_status_set(read_packet);
+					printf("\n");
+					continue;
+				}
+				if(read_packet->length >0x23){
+					printf("frame len too long %d \n",read_packet->length);
+					continue;
+				}
+				packetlen=read_packet->length+1;
+				while(packetlen >0){
+					readsize=read(gim_fd, readbuf+alread, packetlen);
+					alread+=readsize;
+					packetlen-=readsize;
+				}
+//				for(int i=0;i<read_packet->length+GIMBAL_FRAME_MIN_SIZE;i++){
+//					printf("%#02x,",read_packet->buffer[i]);
+//				}
+//				printf("\n");
+				gimabl_status_set(read_packet);//帧处理
+//					if(readsize <9 &&frame_head==0){
+//						printf("read size not %d\n",readsize);
+//						break;
+//					}
+//					read_packet=(gimbal_packet_t *)(readbuf+alread);
+//					if(read_packet->head !=GIMBAL_FRAME_HEAD && frame_head==0){
+//						printf("head error \n");
+//						for(int i=0;i<9;i++){
+//							printf("%#02x,",read_packet->buffer[i]);
+//						}
+//						break;
+//					}
+//					if(read_packet->length > 0x23){
+//						printf("body size error \n");
+//						break;
+//					}
+//					gimabl_status_set(read_packet);
 //					printf("recv size %d :",readsize);
 //					for(int i=0;i<readsize;i++){
 //						printf("%#02x,",read_packet->buffer[i]);
 //					}
 //					printf("\n");
-					alread+=(read_packet->length+GIMBAL_FRAME_MIN_SIZE);
-					readsize=readsize-read_packet->length-GIMBAL_FRAME_MIN_SIZE;
-				}
+//					alread+=(read_packet->length+GIMBAL_FRAME_MIN_SIZE);
+//					readsize=readsize-read_packet->length-GIMBAL_FRAME_MIN_SIZE;
 #endif
-#if 0
-				readsize=read(gim_fd, read_packet.buffer, 9);
-				if(readsize <0){
-					close(gim_fd);
-					FD_CLR(gim_fd,&read_fds);
-					printf("recv error:\n");
-					break;
-				}
-				if(readsize <9){
-					 printf("read size not \n");
-					 serial_flush(gim_fd);
-					 continue;
-				}
-				if(read_packet.head !=GIMBAL_FRAME_HEAD){
-					  printf("head error \n");
-					  for(int i=0;i<9;i++){
-						  printf("%#02x,",read_packet.buffer[i]);
-					  }
-					  serial_flush(gim_fd);
-					  continue;
-				}
-				if(read_packet.length > 0x23){
-					 printf("body size error \n");
-					 serial_flush(gim_fd);
-					 continue;
-				}
 
-				alread=0;
-				while(1){
-					readsize=read(gim_fd, read_packet.payload+alread, read_packet.length+1-alread);
-					alread+=readsize;
-					if(alread >=read_packet.length+1){
-						break;
-					}
-					usleep(1000);
-					time_count++;
-					if(time_count >5){
-						printf("read data timeout \n");
-						break;
-					}
-				}
-				gimabl_status_set(&read_packet);
-				printf("recv %d: %d\t",read_packet.length,alread);
-				for(int i=0;i<alread+9;i++){
-					printf("%#02x,",read_packet.buffer[i]);
-				}
-				printf("\n");
-				alread=0;
-#endif
 			}
 		}
 	}

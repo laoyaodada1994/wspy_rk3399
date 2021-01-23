@@ -12,6 +12,7 @@
 #endif
 #include <ctype.h>
 #include<unistd.h>
+#include "common.h"
 /*****************************************************************************
  * Macro
  */

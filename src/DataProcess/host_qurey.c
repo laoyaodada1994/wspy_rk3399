@@ -67,6 +67,7 @@ int topic_querydown_handle(cJSON * root)
     if (cJSON_GetObjectItem(params, "ver") != NULL) {
         cJSON_AddStringToObject(resp_param, "ver", FirmwareVersion);
     }
+
     if (cJSON_GetObjectItem(params, "ip") != NULL) {
         get_local_ip(tmp_str);
         cJSON_AddStringToObject(resp_param, "ip", tmp_str);
@@ -78,10 +79,12 @@ int topic_querydown_handle(cJSON * root)
     	get_dev_status(tmp_str);
         cJSON_AddStringToObject(resp_param, "status", tmp_str);
     }
+
     if (cJSON_GetObjectItem(params, "channel") != NULL) {
     	get_dev_channel(tmp_str);
         cJSON_AddStringToObject(resp_param, "channel", tmp_str);
     }
+
     if (cJSON_GetObjectItem(params, "protocol") != NULL) {
     	get_dev_hwmode(tmp_str);
         cJSON_AddStringToObject(resp_param, "protocol", tmp_str);
@@ -110,9 +113,9 @@ int topic_querydown_handle(cJSON * root)
 
 query_resp:
 	pdata=cJSON_Print(resp);
+	printf("%s\n",pdata);
     mqtt_publish_msg(MQTT_TOPIC_QUERYUP,(uint8_t *)pdata,strlen(pdata) );
     cJSON_Delete(resp);
-
     return 0;
 }
 
@@ -159,134 +162,9 @@ int rxmsg_json_parse(const char * topic, const char * json)
     		strcpy(Last_Json,json);
     	}
         topic_controldown_handle(rxroot);
+        printf("12312312312321\n");
     } 
-
-#if 0
-    obj = cJSON_GetObjectItem(root, "type");
-    if (obj == NULL) {
-        fprintf(stderr, "msg type is null\n");
-        return -1;
-    }
-    else if (obj->type != cJSON_String) {
-        fprintf(stderr, "the type of \"type\" is not string.\n");
-        return -1;
-    }
-    else if (strcmp(obj->valuestring, " ")) {
-
-    } 
-
-    json_send.id = 1;
-    // memcpy(json_send.sn,obj->valuestring, strlen(obj->valuestring));
-    obj = cJSON_GetObjectItem(root,"sid");//sid 安全标识符
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valuestring=%s\n",obj->type,obj->string,obj->valuestring);
-        memcpy(json_send.sid, obj->valuestring, strlen(obj->valuestring));
-    }
-
-    cJSON * rcv_img = cJSON_GetObjectItem(root,"params");
-
-    obj = cJSON_GetObjectItem(rcv_img,"ip");//ip
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.ip_passn.id = 1;
-    //person->age=obj->valueint;
-    }
-
-    obj = cJSON_GetObjectItem(rcv_img,"net");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.net_netn.id = 1;
-    }
-
-    obj = cJSON_GetObjectItem(rcv_img,"2.4gM");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.gm24_58_passn.id = 1;
-    }
-
-    obj=cJSON_GetObjectItem(rcv_img,"2.4gS");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.gs24_58_passn.id = 1;
-    }
-        
-    obj=cJSON_GetObjectItem(rcv_img,"2.4gC");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.gc24_58_passn.id = 1;
-    }
-            
-    obj=cJSON_GetObjectItem(rcv_img,"2.4gP");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.gp24_58_passn.id = 1;
-    }
-    
-    obj=cJSON_GetObjectItem(rcv_img,"2.4gB");
-    if ( obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.gb24_58_passn.id = 1;
-    }
-
-    obj = cJSON_GetObjectItem(rcv_img,"cpu");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.cpu_passn.id = 1;
-    }
-
-    obj=cJSON_GetObjectItem(rcv_img,"mem");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.mem_passn.id = 1;
-    }
-    
-    obj=cJSON_GetObjectItem(rcv_img,"disk");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.disk_passn.id = 1;
-    }
-
-    obj=cJSON_GetObjectItem(rcv_img,"update");
-    if (obj != NULL) {
-        myprintf("cJSON_GetObjectItem: type=%d, string is %s, valueint=%s\n",
-                    obj->type,
-                    obj->string,
-                    obj->valuestring);
-        json_send.updaten.id = 1;
-    }
-#endif
     cJSON_Delete(rxroot);
-	
    return 0;
 }
 

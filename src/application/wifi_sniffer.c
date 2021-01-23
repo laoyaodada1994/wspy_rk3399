@@ -355,7 +355,7 @@ void wifi_scan_policy(void *arg)
 				}
 				AntennaAngle=angle;
 #ifdef WSPY_CAR
-				gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,tick_count,100);
+				memset(&gim_set_res,0,sizeof(gim_set_res));
 				gim_set_res.recflag=0;
 				gim_set_res.settype=GIMBAL_FRAME_TYPE_QUERY;
 				gim_set_res.angle =angle+180;
@@ -823,7 +823,7 @@ static int format(char * buffer, const mac_link_info_t * info,uint8_t ucchl)
     }
     strcat(buffer, tmp);
     strcat(buffer, "}");
-    printf("ssid buf :%s\n",buffer);
+    //printf("ssid buf :%s\n",buffer);
     return strlen(buffer);
 }
 

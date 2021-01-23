@@ -6,7 +6,7 @@
  */
 #define __USE_GNU
 #define _GNU_SOURCE
-
+#include <sys/ipc.h>
 #include <unistd.h>
 #include <sched.h>
 #include <pthread.h>
@@ -45,9 +45,9 @@
 extern bool StatusQueryEvtOn; //状态下发标志，表示接收到上位机下发指令的标志
 uint32_t DeviceSN;// = 0x10000001;
 const char * FirmwareVersion = "v1.0.2";
-
 time_t now, pretick = 0;
-
+int MsgId;
+int Msg_MqttRx;
 /*****************************************************************
 * 函数描述：mqtti连接函数，用于设备作为客户端去连接mqtt服务器
 * 参数：void
@@ -365,6 +365,31 @@ void gps_task(void)
         sleep(2);
     }
 }
+void *mqtt_rxmsg_handler(void *param)
+{
+    pthread_t sub_pth;
+    msg_t msg;
+    key_t key = ftok("/tmp", 1001);
+    Msg_MqttRx = msgget(key, IPC_CREAT | 8887);
+    if (Msg_MqttRx == -1)
+    {
+        perror("create msg failed\n");
+        exit(-1);
+    }
+
+    for (;;)
+    {
+        if (msgrcv(Msg_MqttRx, (void *)&msg, sizeof(msg.mqtt), 1, 0) <= 0)
+        {
+            usleep(10);
+            continue;
+        }
+
+        rxmsg_json_parse(msg.mqtt.topic, msg.mqtt.payload);
+    }
+    return NULL;
+}
+
 int main(int argc, char * argv[])
 {	
 	pthread_t id1,id2,id3,id4,id5,id6;
@@ -396,8 +421,10 @@ int main(int argc, char * argv[])
     pthread_create(&id2, NULL, (void *)publish_routine, NULL);//发布线程，主动3s周期上报设备状态及GPS信息
     pthread_create(&id3, NULL, (void *)wspy_task, NULL);
     pthread_create(&id4, NULL, (void *)atk_task, NULL);
+    pthread_create(&id6, NULL, mqtt_rxmsg_handler, NULL);
 #ifndef WSPY_CAR
     pthread_create(&id5, NULL, (void *)gps_task, NULL);
+
 #else
 
 #endif
@@ -405,6 +432,7 @@ int main(int argc, char * argv[])
 	pthread_join(id2,NULL);
 	pthread_join(id3,NULL);
 	pthread_join(id4,NULL);
+	pthread_join(id6,NULL);
 #ifndef WSPY_CAR
 	pthread_join(id5,NULL);
 #else

@@ -327,10 +327,10 @@ void gps_report(void)
 }
 /*****************************************************************
 * 函数描述：状态上报函数，用于组帧上报设备状态
-* 参数： 无
+* 参数：  无
 * 返回值： 无
 * ***************************************************************/
-void status_report(void)
+void status_report()
 {
 	cJSON * root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "sn", DeviceSN);

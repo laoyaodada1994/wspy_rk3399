@@ -40,7 +40,7 @@ void get_dev_mode(char *cdev_mode);
 void get_local_ip(char buffer[16]);
 void get_cpu_occupy(char buffer[4]);
 void get_mem_occupy(char oc_str[5]);
-void get_disk_occupy(char oc_str[5]);
+int get_disk_occupy(char oc_str[5]);
 /*****************************************************************
  * 函数描述：设置wifi为sta模式
  * 参数： uint8_t ucchl 设置通道

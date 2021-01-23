@@ -39,6 +39,7 @@ int read_user_config()
 {
     FILE * fp;
     char buf[1048];
+    char wlan_buf[128],cmdbuf[128];
     cJSON * root = NULL;
     cJSON * params = NULL;
     //json路径
@@ -85,11 +86,31 @@ int read_user_config()
 		return -3;
 	}
 	parse_gps(params);
-	params = cJSON_GetObjectItem(root, "wlan");
-	if (params == NULL) {
-		fprintf(stderr, "error: not found device configuration\n");
-		cJSON_Delete(root);
-		return -3;
+
+	float fusb[2]={0.0,0.0};
+	for(int i=0; i <2;i++){
+		memset(cmdbuf,0,sizeof(cmdbuf));
+		memset(wlan_buf,0,sizeof(wlan_buf));
+		sprintf(cmdbuf,"dmesg |grep \"usb %d-1\" |grep Sinux |awk '{print $2}'|awk -F']' '{print $1}'",i+1);
+		sys_get(cmdbuf,wlan_buf,sizeof(wlan_buf));
+		fusb[i] = atof(wlan_buf);
+		printf("usb time %d %f\n",i,fusb[i]);
+	}
+	if(fusb[0] > fusb[1]){
+		params = cJSON_GetObjectItem(root, "wlan1");
+		if (params == NULL) {
+			fprintf(stderr, "error: not found device configuration\n");
+			cJSON_Delete(root);
+			return -3;
+		}
+	}
+	else{
+		params = cJSON_GetObjectItem(root, "wlan2");
+		if (params == NULL) {
+			fprintf(stderr, "error: not found device configuration\n");
+			cJSON_Delete(root);
+			return -3;
+		}
 	}
 	parse_wlan(params);
     return 0;
@@ -227,6 +248,7 @@ void parse_wlan(cJSON* param)
 		sprintf(dev_name,"dev%d",i);
 		if (strcmp(cJSON_GetArrayItem(param, i)->string,dev_name) == 0){//获取网卡名称
 			strcpy(UserCfgJson.wlan_dev[i],cJSON_GetArrayItem(param, i)->valuestring);
+			printf("%s\n",UserCfgJson.wlan_dev[i]);
 		}
 	}
 }

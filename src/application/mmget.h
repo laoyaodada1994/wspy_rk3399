@@ -35,8 +35,17 @@ void mmget_init();
 void *mmget_file(void *param_mm);
 /*****************************************************************
  * 函数描述：创建木马下发线程
- * 参数：无
+ * 参数：  cJSON* param_mm JSON 木马参数缓存指针
+ * 		  int settype  设置参数
+ * 		  				0  删除文件
+ * 		  				1 下发文件
  * 返回值： 无
  * ***************************************************************/
-void mmget_thread_start(cJSON* param_mm);
+void mmget_thread_start(cJSON* param_mm,int settype);
+/*****************************************************************
+* 函数描述：文件读取函数
+* 参数：	   char *basePath 文件目录缓存指针
+* 返回值： int
+****************************************************************/
+int readFileList(char *basePath,cJSON* filesarray);
 #endif /* MMGET_H_ */

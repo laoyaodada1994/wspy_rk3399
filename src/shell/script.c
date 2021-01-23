@@ -225,18 +225,27 @@ void get_cpu_occupy(char oc_str[5])
     oc_sys=atoi(buffer);
     sprintf(oc_str, "%d", 100-oc_sys);
 }
-void get_disk_occupy(char oc_str[5])
+int get_disk_occupy(char oc_str[5])
 {
 	float fused;
+	int iused;
     char buffer[256];
 	FILE * fp;
-	fp = popen("df -h|grep mmc|awk '{print $5}'","r");
+	fp = popen("df -h|grep mmcblk1p5|awk '{print $5}'","r");
 	fgets(buffer, sizeof(buffer), fp);
 
 	fused=atof(buffer);
 	sprintf(oc_str, "%.1f", fused);
 	pclose(fp);
+
+	fp = popen("df -m|grep mmcblk1p5|awk '{print $4}'","r");
+	fgets(buffer, sizeof(buffer), fp);
+
+	iused=atoi(buffer);
+	pclose(fp);
+	return iused;
 }
+
 void get_mem_occupy(char oc_str[5])
 {
     int mem_total, mem_free;

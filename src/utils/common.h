@@ -18,8 +18,18 @@
  * Macro
  */
 //typedef unsigned int bool;
+#define FALSE 0
+#define TRUE 1
 #include<string.h>
+struct mqtt_msg {
+     char topic[16];
+     char payload[1024];
+};
 
+typedef struct {
+     long type;
+     struct mqtt_msg mqtt;
+} msg_t;
 #define LONGITUDE	"longitude"
 #define LATITUDE	"latitude"
 

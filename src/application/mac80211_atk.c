@@ -123,6 +123,11 @@ int wifi_atkpolicy_parse(cJSON* param_ap,cJSON* param_sta)
     else{
     	AtkInfo.taget = ATK_TAGET_AP;
     }
+    cJSON *angobj=cJSON_GetObjectItem(param_ap, "Angle");
+    if(angobj == NULL){
+    	printf("no angle obj\n");
+    	return -1;
+    }
     AtkInfo.angle = cJSON_GetObjectItem(param_ap, "Angle")->valueint;
 	if(AtkInfo.angle <MIN_ANGLE){
 		AtkInfo.angle=MIN_ANGLE;

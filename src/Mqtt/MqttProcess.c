@@ -17,6 +17,7 @@
 #include "MqttProcess.h"
 #include "status.h"
 #include "script.h"
+#include <sys/msg.h>
 char default_gw_ip[32];
 //MqttSub        waibudingyi
 //#define ADDRESS     "tcp://localhost:1883"
@@ -39,6 +40,7 @@ int subscribed = 0;
 // int finished = 0;
 volatile enum mqtt_status MQTT_Connc_On=MqttDisconnected;
 MQTTAsync Client=NULL;
+extern int Msg_MqttRx;
 /***********************************************************************************
  *                                  Function
  ***********************************************************************************/
@@ -51,20 +53,46 @@ void on_mqtt_connlost(void *context, char * cause)
 
 int on_mqtt_received(void * context, char * topic, int topicLen, MQTTAsync_message * message)
 {
-    if (message->payloadlen == 0) {
-        fprintf(stderr, "received null message from topic: %s\n", topic);
-        return -1;
-    }
+	int err = 1;
+	int len;
+	msg_t msg;
 
-    myprintf("received topic %s, msgid:%d pay len %d \n", topic, message->msgid,message->payloadlen);
-    
-    rxmsg_json_parse(topic, message->payload);
-    // memset(message->payload, 0, 10);
-    printf("message->payloadlen=%d\n",message->payloadlen);
-    message->payloadlen = 0;
-    MQTTAsync_freeMessage(&message);
-    MQTTAsync_free(topic);
-    return 1;
+//	if (context == NULL){
+//		err = -1;
+//		goto rx_cb_exit;
+//	}
+
+
+	if (message->payloadlen == 0){
+			fprintf(stderr, "received null message from topic: %s\n", topic);
+			err = -1;
+			goto rx_cb_exit;
+	}
+	else{
+			msg.type = 1;
+			strcpyl(msg.mqtt.topic, topic, (unsigned int)(topicLen + 1));
+			len = (message->payloadlen >= sizeof(msg.mqtt.payload)) ? sizeof(msg.mqtt.payload) : message->payloadlen;
+			strcpyl(msg.mqtt.payload, message->payload, (unsigned int)len);
+			msgsnd(Msg_MqttRx, (const void *)&msg, sizeof(msg.mqtt.topic) + len, 0);
+			// rxmsg_json_parse(topic, message->payload);
+	}
+
+rx_cb_exit:
+	MQTTAsync_freeMessage(&message);
+	MQTTAsync_free(topic);
+
+	return err;
+//    if (message->payloadlen == 0) {
+//        fprintf(stderr, "received null message from topic: %s\n", topic);
+//        return -1;
+//    }
+//
+//    rxmsg_json_parse(topic, message->payload);
+////    printf("message->payloadlen=%d %s\n",message->payloadlen,(char *)message->payload);
+//    //message->payloadlen = 0;
+//    MQTTAsync_freeMessage(&message);
+//    MQTTAsync_free(topic);
+//    return 1;
 }
 
 void on_mqtt_published(void * context, MQTTClient_deliveryToken dt)
