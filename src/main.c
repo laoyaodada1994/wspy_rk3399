@@ -428,7 +428,7 @@ int main(int argc, char * argv[])
     }
 #ifndef WSPY_CAR
     pthread_create(&id5, NULL, (void *)gps_task, NULL);
-    gimbal_set_angle(0,1);
+    res=gimbal_set_angle(0,1);
    	if(res <=0){
    		gimbal_bsabort_send(0,1);
    	}
