@@ -22,7 +22,9 @@
 #include <time.h>
 #include "common.h"
 #include "gimbal.h"
+#include "cJSON.h"
 #include "serialport.h"
+#include "MqttProcess.h"
 
 CHTOFREQ g_charry [] ={
 		{.channel = 36,.ffreq = 5.180,.lfreq=5180},
@@ -328,9 +330,32 @@ int gimbal_set_angle(int angle,uint8_t channel)
 	printf("\n");
 	res=write(gim_fd, sendbuf, sizeof(tdbf)+1);
 	printf("set angle: %d freq %f send len %d fd %d\n", angle,curfreq,res,gim_fd);
-	return 0;
+	return res;
 }
 #endif
+/*****************************************************************
+* 函数描述：波束控制异常处理报告
+* 参数： float angle	转台角度
+* 		int chl
+* 返回值：   无
+****************************************************************/
+void gimbal_bsabort_send(float angle,int chl)
+{
+	char souree_buf[256];
+	memset(souree_buf,0,sizeof(souree_buf));
+	cJSON *resp = cJSON_CreateObject();
+	cJSON_AddStringToObject(resp, "type", "CtrlAborted");
+	cJSON_AddNumberToObject(resp, "sn", DeviceSN);
+	cJSON_AddStringToObject(resp, "source", "波束控制");
+	cJSON_AddStringToObject(resp, "name", "波束控制异常");
+	sprintf(souree_buf,"波束控制%d度,信道%d异常，未收到应答，请检查",(int)angle,chl);
+	cJSON_AddStringToObject(resp, "detail", souree_buf);
+	cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level2);
+	char *pdata = cJSON_Print(resp);
+	mqtt_publish_msg(MQTT_TOPIC_FAIL,(uint8_t *)pdata,strlen(pdata) );
+	cJSON_Delete(resp);
+}
+
 /*****************************************************************
 * 函数描述：转台速率设置
 * 参数：	  uint8_t speed 转台速率值
@@ -464,6 +489,56 @@ void gimbal_init()
     printf("gimbal fd :%d\n",gim_fd);
 }
 /*****************************************************************
+* 函数描述：转台异常处理报告
+* 参数：	   int type  转台控制类型
+* 		   float angle	转台角度
+* 返回值：   无
+****************************************************************/
+void gimbal_abort_send(int type,float angle)
+{
+	char souree_buf[256];
+
+	cJSON *resp = cJSON_CreateObject();
+	cJSON_AddStringToObject(resp, "type", "CtrlAborted");
+    cJSON_AddNumberToObject(resp, "sn", DeviceSN);
+    cJSON_AddStringToObject(resp, "source", "转台控制");
+	switch(type){
+	case GIMBAL_FRAME_TYPE_CONF:
+		{
+			cJSON_AddStringToObject(resp, "name", "转台速率设置异常");
+			cJSON_AddStringToObject(resp, "detail", "转台速率设置，未收到设置应答，请检查");
+			cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level4);
+		}
+		break;
+	case GIMBAL_FRAME_TYPE_RST:
+		{
+			cJSON_AddStringToObject(resp, "name", "转台复位控制异常");
+			cJSON_AddStringToObject(resp, "detail", "控制转台复位，未接收到复位应答，请检查");
+			cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level2);
+		}
+		break;
+	case GIMBAL_FRAME_TYPE_CTRL:
+		{
+			cJSON_AddStringToObject(resp, "name", "转台角度控制异常");
+			memset(souree_buf,0,sizeof(souree_buf));
+			sprintf(souree_buf,"控制转台转动%d度失败，未接收到转动应答，请检查",(int)angle);
+			cJSON_AddStringToObject(resp, "detail", souree_buf);
+			cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level2);
+		}
+		break;
+	default:{
+			cJSON_AddStringToObject(resp, "name", "转台未知控制异常");
+			cJSON_AddStringToObject(resp, "detail", "转台控制未知异常，请检查");
+			cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level3);
+			break;
+		}
+	}
+	char *pdata = cJSON_Print(resp);
+	printf("%s\n",pdata);
+	mqtt_publish_msg(MQTT_TOPIC_FAIL,(uint8_t *)pdata,strlen(pdata) );
+	cJSON_Delete(resp);
+}
+/*****************************************************************
 * 函数描述：转台初始化设置函数，设置转台转动速率及复位角度
 * 参数：	  无
 * 返回值：  无
@@ -474,8 +549,10 @@ void gimbal_init_set()
 	memset(&gim_set_res,0,sizeof(gim_set_res));
 	gim_set_res.settype=GIMBAL_FRAME_TYPE_CONF;
 	gimbal_set_speed(2);
-	gimabl_status_parse(GIMBAL_FRAME_TYPE_CONF,3,500);
-
+	res=gimabl_status_parse(GIMBAL_FRAME_TYPE_CONF,3,500);
+	if(res !=0){
+		gimbal_abort_send(GIMBAL_FRAME_TYPE_CONF,0);
+	}
 //	gimbal_set_angle(150);
 //	sleep(20);
 	memset(&gim_set_res,0,sizeof(gim_set_res));
@@ -490,7 +567,10 @@ void gimbal_init_set()
 		gim_set_res.settype=GIMBAL_FRAME_TYPE_RST;
 		gim_set_res.angle=180;
 		gimbal_reset();
-		gimabl_status_parse(GIMBAL_FRAME_TYPE_RST,10,1000);
+		res=gimabl_status_parse(GIMBAL_FRAME_TYPE_RST,10,1000);
+		if(res!=0){
+			gimbal_abort_send(GIMBAL_FRAME_TYPE_RST,0);
+		}
 	}
 #if 0
 	while(1){

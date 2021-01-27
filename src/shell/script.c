@@ -20,6 +20,7 @@
 #include "common.h"
 #include "status.h"
 #include "wifi_sniffer.h"
+#include "wifi_access.h"
 #define PROCESS_STATUS_NAME "lasted_status.conf"	//程序状态文件
 /***********************************************************************
  *                              Declare
@@ -36,10 +37,10 @@
 * 参数：    char *ip_str ip信息输出字串
 * 返回值：  无
 ****************************************************************/
-void get_local_ip(char ip_str[16])
+void get_local_ip(char ip_str[32])
 {
     FILE * fp;
-    char resbuf[128],cmdbuf[128],local_ip[128];
+    char resbuf[512],cmdbuf[512],local_ip[512];
     uint16_t usport =0 ;
 #if 0
     memset(resbuf,0,sizeof(resbuf));
@@ -284,10 +285,26 @@ void get_mem_occupy(char oc_str[5])
  * ***************************************************************/
 void strobe_wifi_sta(uint8_t ucchl)
 {
+	char getbuf[128];
 	char cmdbuf[128];
 	memset(cmdbuf,0,sizeof(cmdbuf));
 	sprintf(cmdbuf,"ifconfig %s down;iwconfig %s mode manager;ifconfig %s up",UserCfgJson.wlan_dev[ucchl],UserCfgJson.wlan_dev[ucchl],UserCfgJson.wlan_dev[ucchl]);
 	system(cmdbuf);
+
+	usleep(100000);
+	memset(cmdbuf,0,sizeof(cmdbuf));
+	sprintf(cmdbuf,"ifconfig |grep %s",UserCfgJson.wlan_dev[ucchl]);
+	if(strstr(getbuf,UserCfgJson.wlan_dev[ucchl]) == NULL){
+		wlan_abort(UserCfgJson.wlan_dev[ucchl],1,ACCESS_MODE_STA);
+	}
+	else{
+		memset(cmdbuf,0,sizeof(cmdbuf));
+		sprintf(cmdbuf,"iwconfig  %s|grep Mode",UserCfgJson.wlan_dev[ucchl]);
+		sys_get(cmdbuf,getbuf,sizeof(getbuf));
+		if(strstr(getbuf,"Managed") == NULL){
+			wlan_abort(UserCfgJson.wlan_dev[ucchl],0,ACCESS_MODE_STA);
+		}
+	}
 }
 /*****************************************************************
  * 函数描述：设置wifi为monitor模式
@@ -300,6 +317,8 @@ void strobe_wifi_monitor(uint8_t ucchl,uint8_t ifup)
     // system("wifi down");
     // usleep(500000);
 	char cmdbuf[128];
+	char getbuf[128];
+	int res = 0;
 #ifndef ZRRJ
 	if(ucchl &0x1){ //设置wifi0为monitor
 		system("uci set wireless.@wifi-iface[0].mode=monitor && uci set wireless.wifi0.disabled=0");
@@ -318,6 +337,23 @@ void strobe_wifi_monitor(uint8_t ucchl,uint8_t ifup)
 	system(cmdbuf);
 #endif
     usleep(500000);
+
+    memset(cmdbuf,0,sizeof(cmdbuf));
+    sprintf(cmdbuf,"ifconfig |grep %s",UserCfgJson.wlan_dev[ucchl]);
+    sys_get(cmdbuf,getbuf,sizeof(getbuf));
+
+    if(strstr(getbuf,UserCfgJson.wlan_dev[ucchl]) == NULL){
+    	wlan_abort(UserCfgJson.wlan_dev[ucchl],1,ACCESS_MODE_MONITOR);
+    }
+    else{
+        memset(cmdbuf,0,sizeof(cmdbuf));
+        sprintf(cmdbuf,"iwconfig %s|grep Mode",UserCfgJson.wlan_dev[ucchl]);
+        sys_get(cmdbuf,getbuf,sizeof(getbuf));
+        printf("%s\n",getbuf);
+        if(strstr(getbuf,"Monitor")!= NULL){
+        	wlan_abort(UserCfgJson.wlan_dev[ucchl],0,ACCESS_MODE_MONITOR);
+        }
+    }
 }
 /*****************************************************************
  * 函数描述：设置wifi为ap模式

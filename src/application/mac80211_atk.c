@@ -110,6 +110,7 @@ void stop_sta_inter(void)
  * ***************************************************************/
 int wifi_atkpolicy_parse(cJSON* param_ap,cJSON* param_sta)
 {
+	int res=0;
 	char cmd[64];
 	uint8_t ucchl=0;
     if (param_ap == NULL){
@@ -153,6 +154,9 @@ int wifi_atkpolicy_parse(cJSON* param_ap,cJSON* param_sta)
     gimbal_set_angle(AtkInfo.angle);
 #else
 	gimbal_set_angle(AtkInfo.angle,AtkInfo.channel);
+	if(res <=0){
+		gimbal_bsabort_send(AtkInfo.angle,AtkInfo.channel);
+	}
 #endif
     cJSON* ap_mac = cJSON_GetObjectItem(param_ap, "mac");//获取ap mac地址
 	if (ap_mac == NULL){

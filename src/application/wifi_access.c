@@ -49,6 +49,19 @@ int  ap_acess_report()
 {
 	 char iwinfo[256];
 	 char cmdinfo[1024];
+	 char getbuf[128];
+	 memset(iwinfo,0,sizeof(iwinfo));
+	 if(strstr(getbuf,UserCfgJson.wlan_dev[WifiAccess.band]) == NULL){
+	 		wlan_abort(UserCfgJson.wlan_dev[WifiAccess.band],1,ACCESS_MODE_AP);
+	 }
+	 else{
+		memset(iwinfo,0,sizeof(iwinfo));
+		sprintf(iwinfo,"iwconfig %s|grep Mode",UserCfgJson.wlan_dev[WifiAccess.band]);
+		sys_get(iwinfo,getbuf,sizeof(getbuf));
+		if(strstr(getbuf,"Managed") == NULL){
+			wlan_abort(UserCfgJson.wlan_dev[WifiAccess.band],0,ACCESS_MODE_AP);
+		}
+	}
 #if 0
 	 char client_mac[64];
 	 sprintf(client_mac,"%02x:%02x:%02x:%02x:%02x:%02x",WifiAccess.sta_mac[0],
@@ -80,6 +93,7 @@ int  ap_acess_report()
 		 return 0;
 #endif
 	// }
+
 	 return 0;
 }
 /*****************************************************************
@@ -217,7 +231,8 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 {
 	uint8_t uc_zrglag=0xff;
 	char *zr_encry=NULL;
-    if (param == NULL) {
+	int res=0;
+	if (param == NULL) {
     	WifiAccess.mode = ACCESS_MODE_INVALID;
     	return -1;
     }
@@ -387,8 +402,12 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 
 #ifdef WSPY_CAR //设置前端的角度和信道
     gimbal_set_angle(WifiAccess.angle);
+
 #else
-	gimbal_set_angle(WifiAccess.angle,WifiAccess.channel);
+	res=gimbal_set_angle(WifiAccess.angle,WifiAccess.channel);
+	if(res <=0){
+		gimbal_bsabort_send(WifiAccess.angle,WifiAccess.channel);
+	}
 #endif
 	memset(cmd, 0, sizeof(cmd));
 	if(ucchl == 0){//如果是2.4G
@@ -583,7 +602,14 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 			WifiAccess.mode = ACCESS_MODE_AP;
 			strobe_wifi_sta(ucchl);
 			strobe_wifi_monitor(ucchl+2,1);
-			snprintf(cmd, sizeof(cmd),"pseudo_ap_server %s %d %d %s %s &",UserCfgJson.wlan_dev[ucchl],3,WifiAccess.channel,ssid,key);
+			int lhmode=0;
+			if(strstr(encryption,"WEP")){
+				lhmode =4;
+			}
+			else{
+				lhmode=3;
+			}
+			snprintf(cmd, sizeof(cmd),"pseudo_ap_server %s %d %d %s %s &",UserCfgJson.wlan_dev[ucchl],lhmode,WifiAccess.channel,ssid,key);
 			printf("%s\n",cmd);
 			system(cmd);
 		}
@@ -592,7 +618,17 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 			strobe_wifi_sta(ucchl);
 			strobe_wifi_sta(ucchl+2);
 			memset(cmd, 0, sizeof(cmd));
-			snprintf(cmd, sizeof(cmd),"pseudo_sta_server %s  %s %s &",UserCfgJson.wlan_dev[ucchl],ssid,key);
+			int lhmode=0;
+			if(strstr(encryption,"WEP")){
+				lhmode =2;
+			}
+			else if(strstr(encryption,"NONE")){
+				lhmode=3;
+			}
+			else{
+				lhmode=1;
+			}
+			snprintf(cmd, sizeof(cmd),"pseudo_sta_server %s  %s %s %d &",UserCfgJson.wlan_dev[ucchl],ssid,key,lhmode);
 			printf("%s\n",cmd);
 			system(cmd);
 		}

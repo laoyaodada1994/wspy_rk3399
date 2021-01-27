@@ -256,8 +256,11 @@ int topic_controldown_handle(cJSON * root)
     else if (!strcmp(type->valuestring, "staStopCapture")) {
         update_status("staCapture", "result-manual", NULL);
         cJSON_AddStringToObject(resp, "error", "none");
-
-        start_url_sniffer(NULL,NULL,NULL,0);
+        cJSON * id = cJSON_GetObjectItem(root, "id");
+        if(id == NULL){
+        	printf("stop snif is null\n");
+        }
+        start_url_sniffer(NULL,NULL,id,0);
     }
     else if (!strcmp(type->valuestring, "staTrojan")) {
     //    update_status("staTrojan", "status-run", "staAttach");

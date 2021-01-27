@@ -37,7 +37,7 @@ void get_dev_htmode(char *cdev_mode);
 * 返回值：  无
 ****************************************************************/
 void get_dev_mode(char *cdev_mode);
-void get_local_ip(char buffer[16]);
+void get_local_ip(char buffer[32]);
 void get_cpu_occupy(char buffer[4]);
 void get_mem_occupy(char oc_str[5]);
 int get_disk_occupy(char oc_str[5]);

@@ -219,7 +219,7 @@ int wifi_scan_policy_parse(cJSON* root)
 void wifi_scan_policy(void *arg)
 {  
 	uint8_t ch_idx[IEEE80211BANDS] = {0,0},bsctrl_flag=BSCTRL_INIT;
-    int angle=0,step=0;
+    int angle=0,step=0,res=0;
     uint32_t tick,tick_count=0;
     uint8_t ucchl1=0,ucchl2=0,chlable[IEEE80211BANDS];
     int fix_flag=0;
@@ -275,12 +275,18 @@ void wifi_scan_policy(void *arg)
 		gim_set_res.angle = angle+180;
 		gimbal_set_angle((float)angle); //如果是车载，则设置转台角度
 		gim_set_res.setflag=1;
-		gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,ZT_MAX_SCANTIME,1000);
+		res=gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,ZT_MAX_SCANTIME,1000);
+		if(res!=0){
+			gimbal_abort_send(GIMBAL_FRAME_TYPE_CTRL,angle);
+		}
     }
 #else
     for(int i=0;i<IEEE80211BANDS;i++){
 		if(chlable[i]){
-			gimbal_set_angle(angle,ScanPolicy.channel[i].table[ch_idx[i]]);//，如果是便携，则先设置一次角度和信道
+			res=gimbal_set_angle(angle,ScanPolicy.channel[i].table[ch_idx[i]]);//，如果是便携，则先设置一次角度和信道
+			if(res <=0){
+				gimbal_bsabort_send(angle,ScanPolicy.channel[i].table[ch_idx[i]]);
+			}
 		}
 	}
 //    gimbal_set_angle(angle);
@@ -322,7 +328,11 @@ void wifi_scan_policy(void *arg)
 				system(cmdbuf);
 				printf("scan channel : %d\n", channel[i]);
 #ifndef WSPY_CAR
-				gimbal_set_angle(angle,channel[i]);
+				res=gimbal_set_angle(angle,channel[i]);
+				if(res <=0){
+					gimbal_bsabort_send(angle,channel[i]);
+				}
+
 #endif
 			}
 		}
@@ -363,12 +373,17 @@ void wifi_scan_policy(void *arg)
 				usleep(20000);
 				gim_set_res.setflag=1;
 				gimabl_status_parse(GIMBAL_FRAME_TYPE_QUERY,ZT_MAX_SCANTIME,1000);
-
+				if(res!=0){
+					gimbal_abort_send(GIMBAL_FRAME_TYPE_CTRL,angle);
+				}
 #else
 
 				for(int i=0;i<IEEE80211BANDS;i++){
 					if(chlable[i]){
-						gimbal_set_angle(angle,channel[i]);
+						res=gimbal_set_angle(angle,channel[i]);
+						if(res <=0){
+							gimbal_bsabort_send(angle,channel[i]);
+						}
 						printf("turn set angle %d channel %d\n",angle,channel[i]);
 					}
 				}

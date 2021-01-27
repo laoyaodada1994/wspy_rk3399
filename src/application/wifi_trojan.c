@@ -235,6 +235,7 @@ void start_url_sniffer(cJSON* ap,cJSON* sta,cJSON* id,uint8_t op_code)
 	else
 	{
 		memset(&g_turl_data,0,sizeof(g_turl_data));
+		strcpy(g_turl_data.id_str,id->valuestring);
 		sprintf(cmdbuf,"url_sniffer stop %s &",g_turl_data.id_str);
 		printf("%s\n",cmdbuf);
 		system(cmdbuf);

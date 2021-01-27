@@ -27,6 +27,7 @@
 #include "host_query.h"
 #include "script.h"
 #include "wifi_sniffer.h"
+#include "wifi_access.h"
 #include "DataProcess.h"
 //#include "./DataProcess/DataProcess.h"
 WSPY_GPS wspy_gps;
@@ -256,6 +257,79 @@ int init_status()
 	rxmsg_json_parse("controlDown",Last_Json);
 	return 0;
 }
+/*****************************************************************
+* 函数描述：gps 异常处理
+* 参数： 无
+* 返回值： 无
+* ***************************************************************/
+void gps_abort()
+{
+	cJSON *resp = cJSON_CreateObject();
+	cJSON_AddStringToObject(resp, "type", "CtrlAborted");
+    cJSON_AddNumberToObject(resp, "sn", DeviceSN);
+    cJSON_AddStringToObject(resp, "source", "gps");
+	cJSON_AddStringToObject(resp, "name", "gps接收异常");
+	cJSON_AddStringToObject(resp, "detail", "gps未接收到经纬度值，请检查");
+	cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level4);
+	char *pdata=cJSON_Print(resp);
+	mqtt_publish_msg(MQTT_TOPIC_FAIL, (uint8_t *)pdata,strlen(pdata));
+	cJSON_Delete(resp);
+}
+/*****************************************************************
+* 函数描述：wlan 故障上报函数
+* 参数： 		char *wlan 网卡名称
+* 			int ifup   是否down
+* 			int mode   网卡模式
+* 返回值： 无
+****************************************************************/
+void wlan_abort(char *wlan,int ifup,int mode)
+{
+	char buf[128];
+	memset(buf,0,sizeof(buf));
+	cJSON *resp = cJSON_CreateObject();
+	cJSON_AddStringToObject(resp, "type", "CtrlAborted");
+	cJSON_AddNumberToObject(resp, "sn", DeviceSN);
+	cJSON_AddStringToObject(resp, "source", "网卡");
+	cJSON_AddStringToObject(resp, "name", "网卡状态异常");
+	if(ifup == 1){
+		sprintf(buf,"未找到网卡%s，请检查网卡",wlan);
+		cJSON_AddStringToObject(resp, "detail", buf);
+		cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level1);
+	}
+	else{
+		switch(mode){
+			case ACCESS_MODE_MONITOR:{
+				sprintf(buf,"网卡%s模式不是monitor，请检查网卡",wlan);
+				cJSON_AddStringToObject(resp, "detail", buf);
+				cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level3);
+			}
+			break;
+			case ACCESS_MODE_AP:{
+				sprintf(buf,"网卡%s模式不是ap，请检查网卡",wlan);
+				cJSON_AddStringToObject(resp, "detail", buf);
+				cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level3);
+			}
+			break;
+			case ACCESS_MODE_STA:{
+				sprintf(buf,"网卡%s模式不是sta，请检查网卡",wlan);
+				cJSON_AddStringToObject(resp, "detail", buf);
+				cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level3);
+			}
+			break;
+			default:{
+				sprintf(buf,"网卡%s模式未知，请检查网卡",wlan);
+				cJSON_AddStringToObject(resp, "detail", buf);
+				cJSON_AddNumberToObject(resp, "alertLevelNo", Abort_Level3);
+			}
+			break;
+		}
+	}
+	char *pdata=cJSON_Print(resp);
+	printf("%s\n",pdata);
+	mqtt_publish_msg(MQTT_TOPIC_FAIL, (uint8_t *)pdata,strlen(pdata));
+	cJSON_Delete(resp);
+}
+
 /*****************************************************************
 * 函数描述：gps 状态上报函数，用于获取gps位置及组帧上报给mqtt服务器
 * 参数： 无

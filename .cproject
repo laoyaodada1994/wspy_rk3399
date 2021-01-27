@@ -35,7 +35,7 @@
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1024996621" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="_BSD_SOURCE_"/>
-									<listOptionValue builtIn="false" value="WSPY_CAR2222"/>
+									<listOptionValue builtIn="false" value="WSPY_CAR222"/>
 									<listOptionValue builtIn="false" value="ZRRJ"/>
 									<listOptionValue builtIn="false" value="LINUX"/>
 								</option>

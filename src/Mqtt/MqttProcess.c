@@ -33,6 +33,7 @@ extern uint32_t PcapMsgPushTm;
  *                                  Variable
  ***********************************************************************************/
 //#pragma pack(1)
+int SubFlag=0; //订阅成功标志
 volatile MQTTAsync_token deliveredtoken_tr;
 //#pragma pack()
 int disc_finished = 0;
@@ -46,8 +47,17 @@ extern int Msg_MqttRx;
  ***********************************************************************************/
 void on_mqtt_connlost(void *context, char * cause)
 {
-    MQTT_Connc_On = MqttLost;
+    if (context == NULL)
+    		return;
 
+	struct mqtt_client_info *client_info = (struct mqtt_client_info *)context;
+
+	MQTT_Connc_On = MqttLost;
+//	MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
+//
+//	printf("MQTT connection lost, sn %d, server ip %s\n", client_info->client_sn, client_info->serverip);
+//	conn_opts.keepAliveInterval = 20;
+//	conn_opts.cleansession = 1;
 	perror("MQTT connection lost\n");
 }
 
@@ -110,7 +120,7 @@ void on_mqtt_disconnect(void* context, MQTTAsync_successData* response)
 void on_mqtt_subscribe(void * context, MQTTAsync_successData * response)
 {
 	printf("subscribe topic \"%s\" succeeded\n", (char *)context);
-
+	SubFlag=1;
 }
 
 void on_mqtt_subscribe_failed(void* context, MQTTAsync_failureData* response)
@@ -148,24 +158,14 @@ void onConnect(void * context, MQTTAsync_successData* response)
 *************************************************************************/
 void onConnectFailure(void* context, MQTTAsync_failureData* response)
 {
-//	int res =0;
-//	MQTTAsync client = (MQTTAsync)context;
-	myprintf("Connect failed, rc %d\n", response ? response->code : 0);
-	MQTT_Connc_On = MqttDisconnected;
-	//red_led_on();
-	//green_led_off();
-//	MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
-//	conn_opts.keepAliveInterval = 20;
-//	conn_opts.cleansession = 1;
-//	conn_opts.onSuccess = onConnect;
-//	conn_opts.onFailure = onConnectFailure;
-//	conn_opts.context = client;
-//	if ((res=MQTTAsync_connect(client, &conn_opts)) != MQTTASYNC_SUCCESS) {
-//		fprintf(stderr, "Failed to start connect, return code %d\n",res);
-//        MQTT_Connc_On = MqttLost;
-//		green_led_off();
-//		// finished = 1;
-//	}
+	if (context == NULL)
+		return;
+
+	struct mqtt_client_info *client_info = (struct mqtt_client_info *)context;
+
+	printf("Connect failed, rc %d\n", response ? response->code : 0);
+
+	MQTT_Connc_On = MqttLost;
 }
 
 void on_mqtt_async_publish_success(void * context, MQTTAsync_successData * response)
@@ -180,7 +180,15 @@ void on_mqtt_async_publish_success(void * context, MQTTAsync_successData * respo
 
 void on_mqtt_async_publish_failed(void* context, MQTTAsync_failureData* response)
 {
-    printf("send failed %s\n",response->message);
+	struct mqtt_client_info *client_info = (struct mqtt_client_info *)context;
+	static int publish_failed_cnt = 0;
+	if (++publish_failed_cnt >= 20)
+	{
+		publish_failed_cnt = 0;
+		MQTT_Connc_On = MqttLost;
+	}
+
+	printf("%s: send failed %d\n", __func__, publish_failed_cnt);
 }
 /*************************************************************************
 *函数描述：mqtt消息发布函数，用于想服务器发送mqtt数据

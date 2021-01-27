@@ -13,7 +13,9 @@
 #include <unistd.h>
 #include "cJSON.h"
 #include "DataProcess.h"
+#include "mac80211_fmt.h"
 
+extern char PcapInterface[IEEE80211BANDS][WDEVNAME_LEN];
 
 json_rcv_config UserCfgJson;
 
@@ -248,6 +250,7 @@ void parse_wlan(cJSON* param)
 		sprintf(dev_name,"dev%d",i);
 		if (strcmp(cJSON_GetArrayItem(param, i)->string,dev_name) == 0){//获取网卡名称
 			strcpy(UserCfgJson.wlan_dev[i],cJSON_GetArrayItem(param, i)->valuestring);
+			strcpy(PcapInterface[i],UserCfgJson.wlan_dev[i]);
 			printf("%s\n",UserCfgJson.wlan_dev[i]);
 		}
 	}

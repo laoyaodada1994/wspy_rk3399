@@ -162,7 +162,6 @@ int rxmsg_json_parse(const char * topic, const char * json)
     		strcpy(Last_Json,json);
     	}
         topic_controldown_handle(rxroot);
-        printf("12312312312321\n");
     } 
     cJSON_Delete(rxroot);
    return 0;

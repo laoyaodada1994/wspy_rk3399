@@ -42,6 +42,7 @@
 /***********************************************************************************
  *                                  Variable
  ***********************************************************************************/
+extern int SubFlag;
 extern bool StatusQueryEvtOn; //状态下发标志，表示接收到上位机下发指令的标志
 uint32_t DeviceSN;// = 0x10000001;
 const char * FirmwareVersion = "v1.0.2";
@@ -98,6 +99,11 @@ void publish_routine(void)
         if (now - pretick >= 3 || StatusQueryEvtOn) {
             status_report();
             gps_report();
+            if(UserCfgJson.gps_disable ==0){ //gps异常上报
+            	if(GPS_Data.latitude<0.0001||GPS_Data.longitude){
+            		gps_abort();
+            	}
+            }
             pretick = now;
 			printf("packet num: %d\t err num : %d\tbitrate :%f%%\n",PacketCount[0].totalcount,
 				PacketCount[0].errcount,((float)PacketCount[0].errcount*100)/PacketCount[0].totalcount);
@@ -340,7 +346,8 @@ void gps_task(void)
 		printf("disabled gps service\n");
 		return;
 	}
-
+	GPS_Data.latitude=0;
+	GPS_Data.longitude=0;
     port = serial_open("/dev/ttyS0", 9600, 8, 1, 'N',0);
     printf("gps fd :%d\n",port);
     if (port == -1) {
@@ -393,18 +400,11 @@ void *mqtt_rxmsg_handler(void *param)
 int main(int argc, char * argv[])
 {	
 	pthread_t id1,id2,id3,id4,id5,id6;
-
+	int res=0;
     printf("Version: %s, Build: %s %s\n", FirmwareVersion, __DATE__, __TIME__);
 
     gimbal_init();
-#ifdef WSPY_CAR
-    pthread_create(&id6, NULL, (void *)gimbal_thread, NULL);
-    sleep(1);
-    gimbal_init_set();
-#else
-    gimbal_set_angle(0,1);
-    gimbal_set_angle(0,36);
-#endif
+
     read_user_config();
     mmget_init();//木马下发初始化
 	memset(default_gw_ip,0,sizeof(default_gw_ip));//获取默认网关
@@ -422,11 +422,24 @@ int main(int argc, char * argv[])
     pthread_create(&id3, NULL, (void *)wspy_task, NULL);
     pthread_create(&id4, NULL, (void *)atk_task, NULL);
     pthread_create(&id6, NULL, mqtt_rxmsg_handler, NULL);
+    while(!SubFlag){
+    	sleep(2);
+    	printf("wait for mqtt connect\n");
+    }
 #ifndef WSPY_CAR
     pthread_create(&id5, NULL, (void *)gps_task, NULL);
-
+    gimbal_set_angle(0,1);
+   	if(res <=0){
+   		gimbal_bsabort_send(0,1);
+   	}
+   	res=gimbal_set_angle(0,36);
+   	if(res <=0){
+   		gimbal_bsabort_send(0,36);
+   	}
 #else
-
+    pthread_create(&id6, NULL, (void *)gimbal_thread, NULL);
+    sleep(1);
+    gimbal_init_set();
 #endif
 	pthread_join(id1,NULL);
 	pthread_join(id2,NULL);

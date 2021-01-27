@@ -178,7 +178,7 @@ void mmget_delete_file(int idx,int settype,char *ctype,int sid)
 		cJSON* str= cJSON_CreateString((const char *)(update));
 		cJSON_AddItemToArray(filearray, str);
 		char *pdata= cJSON_Print(root);
-		printf("%s\n",pdata);
+	//	printf("%s\n",pdata);
 		mqtt_publish_msg("status", (uint8_t *)pdata,strlen(pdata));
 	    cJSON_Delete(root);
 
@@ -262,7 +262,7 @@ void mmfile_query(cJSON *rvroot)
 	diskorr=get_disk_occupy(tmp_disk);
 	cJSON_AddNumberToObject(root, "space", diskorr);
 	char *pdata= cJSON_Print(root);
-	printf("%s\n",pdata);
+//	printf("%s\n",pdata);
 	mqtt_publish_msg("status", (uint8_t *)pdata,strlen(pdata));
 	//printf("%s\n",cJSON_Print(root));
 	cJSON_Delete(root);
@@ -313,9 +313,9 @@ int readFileList(char *basePath,cJSON* filesarray)
              return 1;
          }
      }
-     for(int i=0 ;i<file_count;i++){
-    	 printf("%s\n",file_name[i]);
-     }
+//     for(int i=0 ;i<file_count;i++){
+//    	 printf("%s\n",file_name[i]);
+//     }
 
      closedir(dir);
      return 1;

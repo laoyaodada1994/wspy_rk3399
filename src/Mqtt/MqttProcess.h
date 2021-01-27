@@ -16,6 +16,7 @@
 #define MQTT_TOPIC_CONTROLUP               "controlUp"
 #define MQTT_TOPIC_SCAN               	   "scan"
 #define MQTT_TOPIC_JH               	   "jh"
+#define MQTT_TOPIC_FAIL					   "fail"
 
 
 #define controlDown 	"controlDown"

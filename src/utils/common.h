@@ -21,6 +21,14 @@
 #define FALSE 0
 #define TRUE 1
 #include<string.h>
+
+
+typedef enum {
+	Abort_Level1=1,
+	Abort_Level2,
+	Abort_Level3,
+	Abort_Level4
+};
 struct mqtt_msg {
      char topic[16];
      char payload[1024];
