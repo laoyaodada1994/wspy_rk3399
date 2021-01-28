@@ -323,6 +323,10 @@ int topic_controldown_handle(cJSON * root)
     	printf("do selfDestroy\n");
 		cJSON_AddStringToObject(resp, "error", "none");
 	}
+    else if (!strcmp(type->valuestring, "ctrlShell")) { //远程shell20201231
+    	wifi_access_shell(root);
+		cJSON_AddStringToObject(resp, "error", "none");
+	}
 msg_resp:
 	pdata = cJSON_Print(resp);
     mqtt_publish_msg(MQTT_TOPIC_CONTROLUP,(uint8_t *)pdata,strlen(pdata) );

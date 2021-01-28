@@ -294,6 +294,7 @@ void strobe_wifi_sta(uint8_t ucchl)
 	usleep(100000);
 	memset(cmdbuf,0,sizeof(cmdbuf));
 	sprintf(cmdbuf,"ifconfig |grep %s",UserCfgJson.wlan_dev[ucchl]);
+	sys_get(cmdbuf,getbuf,sizeof(getbuf));
 	if(strstr(getbuf,UserCfgJson.wlan_dev[ucchl]) == NULL){
 		wlan_abort(UserCfgJson.wlan_dev[ucchl],1,ACCESS_MODE_STA);
 	}
@@ -350,7 +351,7 @@ void strobe_wifi_monitor(uint8_t ucchl,uint8_t ifup)
         sprintf(cmdbuf,"iwconfig %s|grep Mode",UserCfgJson.wlan_dev[ucchl]);
         sys_get(cmdbuf,getbuf,sizeof(getbuf));
         printf("%s\n",getbuf);
-        if(strstr(getbuf,"Monitor")!= NULL){
+        if(strstr(getbuf,"Monitor")== NULL){
         	wlan_abort(UserCfgJson.wlan_dev[ucchl],0,ACCESS_MODE_MONITOR);
         }
     }

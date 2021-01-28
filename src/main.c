@@ -16,6 +16,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <net/if.h>
+#include <sys/msg.h>
 #include "common.h"
 #include "status.h"
 #include "mac80211_fmt.h"

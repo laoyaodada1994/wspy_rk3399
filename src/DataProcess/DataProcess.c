@@ -98,8 +98,13 @@ int read_user_config()
 		fusb[i] = atof(wlan_buf);
 		printf("usb time %d %f\n",i,fusb[i]);
 	}
+#ifdef WSPY_CAR
+char wlan_name[2][6]={"wlan2","wlan1"};
+#else
+char wlan_name[2][6]={"wlan1","wlan2"};
+#endif
 	if(fusb[0] > fusb[1]){
-		params = cJSON_GetObjectItem(root, "wlan1");
+		params = cJSON_GetObjectItem(root, wlan_name[0]);
 		if (params == NULL) {
 			fprintf(stderr, "error: not found device configuration\n");
 			cJSON_Delete(root);
@@ -107,7 +112,7 @@ int read_user_config()
 		}
 	}
 	else{
-		params = cJSON_GetObjectItem(root, "wlan2");
+		params = cJSON_GetObjectItem(root, wlan_name[1]);
 		if (params == NULL) {
 			fprintf(stderr, "error: not found device configuration\n");
 			cJSON_Delete(root);

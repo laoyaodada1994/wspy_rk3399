@@ -29,7 +29,7 @@
 /***********************************************************************************
  *                                  Declare
  ***********************************************************************************/
-#define WEP_MAX_NUM 30000 //最多缓存2万帧
+#define WEP_MAX_NUM 25000 //最多缓存2.5万帧
 #define WEP_BUF_MAX_LEN 20<<20 //20M长度
 uint8_t *Wep_Data = NULL; //wep缓存指针
 uint32_t Wep_Len=0; //Wep缓存长度
@@ -145,6 +145,7 @@ int wifi_decrypt_policy_parse(cJSON* param)
 
 	char data[64],cbuf[64];
 	char *mac = NULL;
+	char *stamac = NULL;
 	char *key = NULL;
 	char *encryption = NULL;
 
@@ -158,20 +159,12 @@ int wifi_decrypt_policy_parse(cJSON* param)
 			mac = cJSON_GetArrayItem(param, i)->valuestring;
 			getmac(mac, 1, WifiDecrypt.bssid);
 			printf ("mac:%s\n", mac);
-//			WifiDecrypt.sta[0]=0x5c;
-//			WifiDecrypt.sta[1]=0xc3;
-//			WifiDecrypt.sta[2]=0x07;
-//			WifiDecrypt.sta[3]=0x80;
-//			WifiDecrypt.sta[4]=0x2b;
-//			WifiDecrypt.sta[5]=0x8d;
-
-			WifiDecrypt.sta[0]=0x70;
-			WifiDecrypt.sta[1]=0x8f;
-			WifiDecrypt.sta[2]=0x47;
-			WifiDecrypt.sta[3]=0x5f;
-			WifiDecrypt.sta[4]=0x36;
-			WifiDecrypt.sta[5]=0xa5;
-		}else if (strcmp(cJSON_GetArrayItem(param, i)->string,"ch") == 0){//获取信道
+		}else if(strcmp(cJSON_GetArrayItem(param, i)->string,"staMac") == 0){//wep使用
+			stamac= cJSON_GetArrayItem(param, i)->valuestring;
+			getmac(stamac, 1, WifiDecrypt.sta);
+			printf ("sta mac:%s\n", stamac);
+		}
+		else if (strcmp(cJSON_GetArrayItem(param, i)->string,"ch") == 0){//获取信道
 			WifiDecrypt.channel = atoi((const char *)cJSON_GetArrayItem(param, i)->valuestring);
 			printf ("channel:%d\n", WifiDecrypt.channel);
 		}else if (strcmp(cJSON_GetArrayItem(param, i)->string,"pro") == 0){//获取协议

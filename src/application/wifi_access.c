@@ -50,7 +50,10 @@ int  ap_acess_report()
 	 char iwinfo[256];
 	 char cmdinfo[1024];
 	 char getbuf[128];
+	 char cmdbuf[128];
 	 memset(iwinfo,0,sizeof(iwinfo));
+	 sprintf(cmdbuf,"ifconfig |grep %s",UserCfgJson.wlan_dev[WifiAccess.band]);
+     sys_get(cmdbuf,getbuf,sizeof(getbuf));
 	 if(strstr(getbuf,UserCfgJson.wlan_dev[WifiAccess.band]) == NULL){
 	 		wlan_abort(UserCfgJson.wlan_dev[WifiAccess.band],1,ACCESS_MODE_AP);
 	 }
@@ -603,7 +606,7 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 			strobe_wifi_sta(ucchl);
 			strobe_wifi_monitor(ucchl+2,1);
 			int lhmode=0;
-			if(strstr(encryption,"WEP")){
+			if(strstr(encryption,"wep")){
 				lhmode =4;
 			}
 			else{
@@ -619,10 +622,10 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 			strobe_wifi_sta(ucchl+2);
 			memset(cmd, 0, sizeof(cmd));
 			int lhmode=0;
-			if(strstr(encryption,"WEP")){
+			if(strstr(encryption,"wep")){
 				lhmode =2;
 			}
-			else if(strstr(encryption,"NONE")){
+			else if(strstr(encryption,"No")){
 				lhmode=3;
 			}
 			else{
@@ -637,7 +640,33 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 	//system("/mnt/mmc/ssl/reset.sh");
     return 0;
 }
-
+/*****************************************************************
+* 函数描述：远程shell 函数，用于修改远程配置文件
+* 参数：cJSON* param JSON格式串缓存指针
+* 返回值： 解析结果
+****************************************************************/
+void wifi_access_shell(cJSON* param)
+{
+	char cmdbuf[128],getbuf[128];
+	memset(cmdbuf,0,sizeof(cmdbuf));
+	memset(getbuf,0,sizeof(getbuf));
+	cJSON * ip = cJSON_GetObjectItem(param, "ip");
+	if(ip !=NULL){
+		sys_get("cat /etc/frpc.ini|grep server_addr",getbuf,sizeof(getbuf));
+		sprintf(cmdbuf,"sed -i \"s/%s/server_addr = %s/g\" /etc/frpc.ini",getbuf,ip->valuestring);
+		printf("%s\n",cmdbuf);
+		system(cmdbuf);
+	}
+	memset(cmdbuf,0,sizeof(cmdbuf));
+	memset(getbuf,0,sizeof(getbuf));
+	cJSON * port = cJSON_GetObjectItem(param, "port");
+	if(port != NULL){
+		sys_get("cat /etc/frpc.ini|grep remote_port",getbuf,sizeof(getbuf));
+		sprintf(cmdbuf,"sed -i \"s/%s/remote_port = %s/g\" /etc/frpc.ini",getbuf,port->valuestring);
+		printf("%s\n",cmdbuf);
+		system(cmdbuf);
+	}
+}
 
 //int wifi_attch_sta_policy_parse(cJSON* param_ap,cJSON* param_sta)
 //{
