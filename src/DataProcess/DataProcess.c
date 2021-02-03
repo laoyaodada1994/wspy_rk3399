@@ -15,7 +15,7 @@
 #include "DataProcess.h"
 #include "mac80211_fmt.h"
 
-extern char PcapInterface[IEEE80211BANDS][WDEVNAME_LEN];
+extern char PcapInterface[4][WDEVNAME_LEN];
 
 json_rcv_config UserCfgJson;
 
@@ -93,7 +93,7 @@ int read_user_config()
 	for(int i=0; i <2;i++){
 		memset(cmdbuf,0,sizeof(cmdbuf));
 		memset(wlan_buf,0,sizeof(wlan_buf));
-		sprintf(cmdbuf,"dmesg |grep \"usb %d-1\" |grep Sinux |awk '{print $2}'|awk -F']' '{print $1}'",i+1);
+		sprintf(cmdbuf,"cat /wspy/dmesg.log |grep \"usb %d-1\" |grep Sinux |awk '{print $2}'|awk -F']' '{print $1}'",i+1);
 		sys_get(cmdbuf,wlan_buf,sizeof(wlan_buf));
 		fusb[i] = atof(wlan_buf);
 		printf("usb time %d %f\n",i,fusb[i]);

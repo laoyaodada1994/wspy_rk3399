@@ -50,6 +50,7 @@ const char * FirmwareVersion = "v1.0.2";
 time_t now, pretick = 0;
 int MsgId;
 int Msg_MqttRx;
+extern WIFI_SHEEL wifi_shell;
 /*****************************************************************
 * 函数描述：mqtti连接函数，用于设备作为客户端去连接mqtt服务器
 * 参数：void
@@ -61,6 +62,7 @@ void mqtt_client(void)
 	while (1) {
         if (MQTT_Connc_On == MqttDisconnected) {
             struct SslInfo tsslinfo;
+            red_led_on();
             printf("connect to server ip: %s, port: %d\n", UserCfgJson.ip, UserCfgJson.port);
             mqtt_connect_to_server(UserCfgJson.ip,UserCfgJson. port, UserCfgJson.clinet_id,&tsslinfo);
         }
@@ -84,6 +86,7 @@ void publish_routine(void)
 {
     int sockfd=-1,lerror=0;
     int trajon_time=0;
+    int shell_time=0;
   //  green_led_off();
 
     sockfd =socket(AF_INET,SOCK_DGRAM,0);
@@ -149,7 +152,17 @@ void publish_routine(void)
             	update_status("apAccess", "result-fail", NULL);
             	WifiAccess.mode=ACCESS_MODE_INVALID;
             }
-
+            else if( WifiAccess.mode==ACCESS_MODE_STA_SUCC &&wifi_shell.shell_flag ==1){
+            	if(shell_time >60){
+            		wifi_shell_status(1);
+            		wifi_shell.shell_flag=0;
+            		shell_time=0;
+            	}
+            	else{
+            		wifi_shell_status(0);
+            		shell_time++;
+            	}
+            }
             StatusQueryEvtOn = false;
             if(g_turl_data.uc_urlsniffer_flag == 1){
                   	trajon_time++;
@@ -158,6 +171,8 @@ void publish_routine(void)
                   		trajon_time=0;
                   	}
 		   }
+
+
         } 
     }
 }
@@ -237,7 +252,7 @@ void wspy_task(void)
         if (PcapOn[IEEE80211_2G4] == true||PcapOn[IEEE80211_5G8] == true) {
         	ucchl=(PcapOn[IEEE80211_2G4]|(PcapOn[IEEE80211_5G8]<<1));
         	chl1scan = false;
-        	printf("%s %d start caputre %d %d\n",__func__,__LINE__,PcapOn[IEEE80211_2G4] ,PcapOn[IEEE80211_5G8] );
+        	printf("%s %d start caputre %d %d %d\n",__func__,__LINE__,PcapOn[IEEE80211_2G4] ,PcapOn[IEEE80211_5G8],ucchl);
             if(PcapOn[IEEE80211_2G4] == true){//开启2.4G网卡抓包线程
             	strobe_wifi_monitor(0,1);
             	strobe_wifi_monitor(2,1);

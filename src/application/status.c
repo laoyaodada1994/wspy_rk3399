@@ -435,7 +435,9 @@ void trans_file( uint8_t *data, uint32_t data_len)
 * ***************************************************************/
 void red_led_on(void)
 {
-    system("echo 1 > /sys/class/leds/sata_led/brightness");
+    system("echo 0 > /sys/class/gpio/gpio149/value  ");
+    system("echo 0 > /sys/class/gpio/gpio152/value  ");
+    system("echo 1 > /sys/class/gpio/gpio155/value  ");
 }
 /*****************************************************************
 * 函数描述：关闭红色led灯
@@ -453,7 +455,9 @@ void red_led_off(void)
 * ***************************************************************/
 void green_led_on(void)
 {
-    system("echo 1 > /sys/class/leds/led_usb1/brightness");
+	system("echo 1 > /sys/class/gpio/gpio149/value");
+	system("echo 0 > /sys/class/gpio/gpio152/value");
+	system("echo 0 > /sys/class/gpio/gpio155/value");
 }
 /*****************************************************************
 * 函数描述：led绿灯关闭函数，控制关闭车载机箱led灯
@@ -463,4 +467,15 @@ void green_led_on(void)
 void green_led_off(void)
 {
     system("echo 0 > /sys/class/leds/led_usb1/brightness");
+}
+/*****************************************************************
+* 函数描述：打开绿色led灯
+* 参数： 无
+* 返回值： 无
+* ***************************************************************/
+void yellow_led_on(void)
+{
+	system("echo 0 > /sys/class/gpio/gpio149/value");
+	system("echo 1 > /sys/class/gpio/gpio152/value");
+	system("echo 0 > /sys/class/gpio/gpio155/value");
 }

@@ -14,14 +14,19 @@
 #include "mac80211_fmt.h"
 #include "common.h"
 
+#ifdef WSPY_CAR
+#define MAX_ANGLE	135  //最大探测角度
+#define MIN_ANGLE 	-135	//最小探测角度
+#else
 #define MAX_ANGLE	50  //最大探测角度
 #define MIN_ANGLE 	-50	//最小探测角度
+#endif
 #define FIX_SCAN_TIME	1//固定角度扫描时间 20201124 modify by lpz
 extern bool PcapOn[];
 extern pthread_mutex_t g_tscanpolicy_mutex;
 extern pthread_mutex_t g_tchl_mutex[];
 extern pthread_mutex_t g_wlanlist_mutex;
-extern char PcapInterface[IEEE80211BANDS][WDEVNAME_LEN];
+extern char PcapInterface[4][WDEVNAME_LEN];
 
 #define NET2G4MAJIDX	0 //2.4G主网卡序号
 #define NET5G8MAJIDX	1 //5.8G主网卡序号

@@ -54,7 +54,7 @@ pcap_dumper_t *out_pcap[IEEE80211BANDS];//抓包文件操作符指针
 bool PcapOn[IEEE80211BANDS]= {false,false};//抓包标识
 //uint32_t PcapMsgPushTm[IEEE80211BANDS] = {0,0};
 int8_t AntennaAngle=0;
-char PcapInterface[IEEE80211BANDS][WDEVNAME_LEN]={"wlan0","wlan2"};//= {"ath0","ath1"};
+char PcapInterface[4][WDEVNAME_LEN]={"wlan0","wlan2","wlan1","wlan3"};//= {"ath0","ath1"};
 static char UploadMsgBuf[IEEE80211BANDS][1024];
 struct scan_policy ScanPolicy;
 MACPACK_COUNT PacketCount[IEEE80211BANDS];
@@ -122,18 +122,18 @@ int wifi_scan_policy_parse(cJSON* root)
 	cJSON * angle = cJSON_GetObjectItem(params, "angle");//获取角度值
 	if (angle != NULL) {
 		ScanPolicy.angle.start = cJSON_GetObjectItem(angle, "start")->valuedouble;
-		if( ScanPolicy.angle.start <-50){//便携设备角度范围为-50到50
-			ScanPolicy.angle.start = -50;
+		if( ScanPolicy.angle.start <MIN_ANGLE){//便携设备角度范围为-50到50
+			ScanPolicy.angle.start = MIN_ANGLE;
 		}
-		if(ScanPolicy.angle.start >50){
-			ScanPolicy.angle.start = 50;
+		if(ScanPolicy.angle.start >MAX_ANGLE){
+			ScanPolicy.angle.start = MAX_ANGLE;
 		}
 		ScanPolicy.angle.end = cJSON_GetObjectItem(angle, "end")->valuedouble;
-		if( ScanPolicy.angle.end <-50){//便携设备角度范围为-50到50
-			ScanPolicy.angle.end = -50;
+		if( ScanPolicy.angle.end <MIN_ANGLE){//便携设备角度范围为-50到50
+			ScanPolicy.angle.end = MIN_ANGLE;
 		}
-		if( ScanPolicy.angle.end >50){
-			ScanPolicy.angle.end=50;
+		if( ScanPolicy.angle.end >MAX_ANGLE){
+			ScanPolicy.angle.end=MAX_ANGLE;
 		}
 		if(ScanPolicy.angle.end > ScanPolicy.angle.start){
 			ScanPolicy.angle.step = cJSON_GetObjectItem(angle, "step")->valuedouble;
@@ -258,7 +258,7 @@ void wifi_scan_policy(void *arg)
 		tick=FIX_SCAN_TIME;
 	}
 	tick_count=tick*10;
-	 printf("Dev %d scan channels: %d\t Dev %d scan channels: %d\n",
+	 printf("channel %d Dev %d scan channels: %d\t Dev %d scan channels: %d\n",ucchl,
 	    		ucchl1 ,ScanPolicy.channel[ucchl1].cnt,
 	    		ucchl2 ,ScanPolicy.channel[ucchl2].cnt);
 	for (int i=0;i<ScanPolicy.channel[ucchl1].cnt;i++)
@@ -838,7 +838,7 @@ static int format(char * buffer, const mac_link_info_t * info,uint8_t ucchl)
     }
     strcat(buffer, tmp);
     strcat(buffer, "}");
-    //printf("ssid buf :%s\n",buffer);
+  //  printf("ssid buf :%s\n",buffer);
     return strlen(buffer);
 }
 
@@ -912,8 +912,10 @@ void radio_message_get(struct ieee80211_radiotap_iterator *iter,radiotap_data_t 
 			break;
 		case IEEE80211_RADIOTAP_DBM_ANTSIGNAL:
 			tmp_signal=*iter->this_arg;
-			if(pradio_data->signal > tmp_signal){//modify by lpz 20201129 取最小值
+			printf("signal %d\n",tmp_signal);
+			if(pradio_data->signal < tmp_signal &&tmp_signal!=0){//modify by lpz 20201129 取最小值
 				pradio_data->signal = tmp_signal;
+				printf("use signal %d\n",pradio_data->signal);
 			}
 			break;
 		default:
@@ -957,6 +959,8 @@ void parse_packet(uint8_t * arg, const struct pcap_pkthdr * pkthdr, const uint8_
 		printf("malformed radiotap header (init returns %d) %d\n", res,packet[0]);
 		return ;
 	}
+    printf("kkkk\n");
+    t_radio_tata.signal=-100;
     while (!(res = ieee80211_radiotap_iterator_next(&iter))) {
     	if (iter.is_radiotap_ns){
     		radio_message_get(&iter,&t_radio_tata);

@@ -88,9 +88,12 @@ int on_mqtt_received(void * context, char * topic, int topicLen, MQTTAsync_messa
 	}
 
 rx_cb_exit:
+	printf("free message\n");
 	MQTTAsync_freeMessage(&message);
+	printf("free topic\n");
 	MQTTAsync_free(topic);
-
+	topic=NULL;
+	printf("free topic end\n");
 	return err;
 //    if (message->payloadlen == 0) {
 //        fprintf(stderr, "received null message from topic: %s\n", topic);
@@ -121,12 +124,14 @@ void on_mqtt_subscribe(void * context, MQTTAsync_successData * response)
 {
 	printf("subscribe topic \"%s\" succeeded\n", (char *)context);
 	SubFlag=1;
+	green_led_on();
 }
 
 void on_mqtt_subscribe_failed(void* context, MQTTAsync_failureData* response)
 {
 	myprintf("Subscribe failed, rc %d\n", response ? response->code : 0);
 	// finished = 1;
+	yellow_led_on();
 }
 
 void onConnect(void * context, MQTTAsync_successData* response)
@@ -231,9 +236,7 @@ void mqtt_publish_msg(const char * topic, const uint8_t * message,int len)
     }
     if ((rc=MQTTAsync_sendMessage(Client, topic, &mqtt_msg, &resp))!=MQTTASYNC_SUCCESS){
     	printf("%s %d error:%d\n",__func__,__LINE__,rc);
-    	MQTTAsync_destroy(&Client);
-    	sleep(1);
-    	MQTT_Connc_On = MqttDisconnected;
+    	MQTT_Connc_On = MqttLost;
     }
 //    MQTTAsync_message * p = &mqtt_msg;
 //    MQTTAsync_freeMessage(&p);

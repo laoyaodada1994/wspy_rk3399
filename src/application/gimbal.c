@@ -567,7 +567,7 @@ void gimbal_init_set()
 		gim_set_res.settype=GIMBAL_FRAME_TYPE_RST;
 		gim_set_res.angle=180;
 		gimbal_reset();
-		res=gimabl_status_parse(GIMBAL_FRAME_TYPE_RST,10,1000);
+		res=gimabl_status_parse(GIMBAL_FRAME_TYPE_RST,30,1000);
 		if(res!=0){
 			gimbal_abort_send(GIMBAL_FRAME_TYPE_RST,0);
 		}

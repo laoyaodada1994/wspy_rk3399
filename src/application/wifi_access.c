@@ -21,11 +21,12 @@
 #include "status.h"
 #include "DataProcess.h"
 #include "script.h"
+#include "MqttProcess.h"
 /***********************************************************************************
  *                                  Declare
  ***********************************************************************************/
 struct wifi_access WifiAccess;
-
+WIFI_SHEEL wifi_shell;
 WSPY_ACESS g_acess_node;
 int g_acesstimeout=0;
 
@@ -52,6 +53,17 @@ int  ap_acess_report()
 	 char getbuf[128];
 	 char cmdbuf[128];
 	 memset(iwinfo,0,sizeof(iwinfo));
+
+	 memset(cmdbuf,0,sizeof(cmdbuf));
+	 memset(getbuf,0,sizeof(getbuf));
+
+	 sys_get("pseudo_ap_server status",getbuf,sizeof(getbuf));
+	 int ap_flag=atoi(getbuf);
+	 if(ap_flag!=1){
+		 printf("ap server not up %d\n",ap_flag);
+		 return -1;
+	 }
+	 memset(getbuf,0,sizeof(getbuf));
 	 sprintf(cmdbuf,"ifconfig |grep %s",UserCfgJson.wlan_dev[WifiAccess.band]);
      sys_get(cmdbuf,getbuf,sizeof(getbuf));
 	 if(strstr(getbuf,UserCfgJson.wlan_dev[WifiAccess.band]) == NULL){
@@ -61,7 +73,7 @@ int  ap_acess_report()
 		memset(iwinfo,0,sizeof(iwinfo));
 		sprintf(iwinfo,"iwconfig %s|grep Mode",UserCfgJson.wlan_dev[WifiAccess.band]);
 		sys_get(iwinfo,getbuf,sizeof(getbuf));
-		if(strstr(getbuf,"Managed") == NULL){
+		if(strstr(getbuf,"Master") == NULL){
 			wlan_abort(UserCfgJson.wlan_dev[WifiAccess.band],0,ACCESS_MODE_AP);
 		}
 	}
@@ -208,13 +220,13 @@ void wifi_stop_acess()
 		system(cmd);
 	}
 	else if(WifiAccess.mode == ACCESS_MODE_STA_SUCC){
-		snprintf(cmd, sizeof(cmd),"pseudo_sta_server stop  &");
+		snprintf(cmd, sizeof(cmd),"pseudo_sta_server stop %s &",UserCfgJson.wlan_dev[WifiAccess.band]);
 		system(cmd);
 	}
 	else{
 		snprintf(cmd, sizeof(cmd),"pseudo_ap_server stop  %s &",UserCfgJson.wlan_dev[WifiAccess.band]);
 		system(cmd);
-		snprintf(cmd, sizeof(cmd),"pseudo_sta_server stop  &");
+		snprintf(cmd, sizeof(cmd),"pseudo_sta_server stop  %s &",UserCfgJson.wlan_dev[WifiAccess.band]);
 		system(cmd);
 	}
 #endif
@@ -612,7 +624,7 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 			else{
 				lhmode=3;
 			}
-			snprintf(cmd, sizeof(cmd),"pseudo_ap_server %s %d %d %s %s &",UserCfgJson.wlan_dev[ucchl],lhmode,WifiAccess.channel,ssid,key);
+			snprintf(cmd, sizeof(cmd),"pseudo_ap_server %s %d %d \"%s\" \"%s\" &",UserCfgJson.wlan_dev[ucchl],lhmode,WifiAccess.channel,ssid,key);
 			printf("%s\n",cmd);
 			system(cmd);
 		}
@@ -631,7 +643,7 @@ int wifi_access_ap_policy_parse(cJSON* param,char * runmode)
 			else{
 				lhmode=1;
 			}
-			snprintf(cmd, sizeof(cmd),"pseudo_sta_server %s  %s %s %d &",UserCfgJson.wlan_dev[ucchl],ssid,key,lhmode);
+			snprintf(cmd, sizeof(cmd),"pseudo_sta_server %s  \"%s\" \"%s\" %d &",UserCfgJson.wlan_dev[ucchl],ssid,key,lhmode);
 			printf("%s\n",cmd);
 			system(cmd);
 		}
@@ -651,23 +663,81 @@ void wifi_access_shell(cJSON* param)
 	memset(cmdbuf,0,sizeof(cmdbuf));
 	memset(getbuf,0,sizeof(getbuf));
 	cJSON * ip = cJSON_GetObjectItem(param, "ip");
-	if(ip !=NULL){
-		sys_get("cat /etc/frpc.ini|grep server_addr",getbuf,sizeof(getbuf));
-		sprintf(cmdbuf,"sed -i \"s/%s/server_addr = %s/g\" /etc/frpc.ini",getbuf,ip->valuestring);
-		printf("%s\n",cmdbuf);
-		system(cmdbuf);
+	if(ip ==NULL){
+		return ;
 	}
-	memset(cmdbuf,0,sizeof(cmdbuf));
-	memset(getbuf,0,sizeof(getbuf));
 	cJSON * port = cJSON_GetObjectItem(param, "port");
-	if(port != NULL){
-		sys_get("cat /etc/frpc.ini|grep remote_port",getbuf,sizeof(getbuf));
-		sprintf(cmdbuf,"sed -i \"s/%s/remote_port = %s/g\" /etc/frpc.ini",getbuf,port->valuestring);
-		printf("%s\n",cmdbuf);
-		system(cmdbuf);
+	if(port == NULL){
+		return ;
 	}
+	cJSON * id = cJSON_GetObjectItem(param, "sid");
+	if(id == NULL){
+		return ;
+	}
+	cJSON * type = cJSON_GetObjectItem(param, "type");
+	if(type == NULL){
+		return ;
+	}
+	wifi_shell.sid=id->valueint;
+	strcpy(wifi_shell.type,type->valuestring);
+	wifi_shell.shell_flag =1;
+	sprintf(cmdbuf,"intra_penetration %s %s &",ip->valuestring,port->valuestring);
+	system(cmdbuf);
 }
+/*****************************************************************
+* 函数描述：远程shell状态查询
+* 参数：  int flag
+* 				1  接入超时
+* 				0  正在接入
+* 返回值： 解析结果
+****************************************************************/
+void wifi_shell_status(int flag)
+{
+	char getbuf[256];
+	cJSON * root = NULL;
+	char *pdata=NULL;
+	if(flag == 1 ){
+		root = cJSON_CreateObject();
+		cJSON_AddStringToObject(root,"type",wifi_shell.type);
+		cJSON_AddNumberToObject(root, "sn", DeviceSN);
+		cJSON_AddNumberToObject(root, "sid", wifi_shell.sid);
+		cJSON_AddNumberToObject(root, "res", 1);
+		cJSON_AddStringToObject(root, "detail", NULL);
+	}
+	else{
+		sys_get("intra_penetration status",getbuf,sizeof(getbuf));
+		if(atoi(getbuf) ==1 ){
+			root = cJSON_CreateObject();
+			cJSON_AddStringToObject(root,"type",wifi_shell.type);
+			cJSON_AddNumberToObject(root, "sn", DeviceSN);
+			cJSON_AddNumberToObject(root, "sid", wifi_shell.sid);
+			cJSON_AddNumberToObject(root, "res", 1);
+			sys_get("cat /tmp/intra_penetration.res|grep -v RES",getbuf,sizeof(getbuf));
+			cJSON_AddStringToObject(root, "detail", getbuf);
+			wifi_shell.shell_flag=0;
+		}
+		else{
+			return ;
+		}
+	}
+	if(root!=NULL)
+	{
+		pdata=cJSON_Print(root);
+		mqtt_publish_msg(MQTT_TOPIC_SHELL,(uint8_t *)pdata,strlen(pdata) );
+		cJSON_Delete(root);
+		root=NULL;
+	}
 
+}
+/*****************************************************************
+* 函数描述：停止远程shell
+* 参数：  无
+* 返回值： 无
+****************************************************************/
+void wifi_shell_stop()
+{
+	system("intra_penetration stop");
+}
 //int wifi_attch_sta_policy_parse(cJSON* param_ap,cJSON* param_sta)
 //{
 //

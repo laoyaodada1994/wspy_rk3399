@@ -86,7 +86,7 @@ void start_stojan(cJSON* ap,cJSON* sta,cJSON* para,uint8_t op_code)
 	}
 	if(op_code == 1){
 		sprintf(cmdbuf,"zr_start.sh %s %s %d &",PcapInterface[ucchl],mac,uc_type);
-		printf("%s\n",cmdbuf);
+		printf("%s ucchl%d\n",cmdbuf,ucchl);
 		if(WifiAccess.mode ==ACCESS_MODE_AP_SUCC){
 			update_status("staTrojan", "status-run", "staAttach");
 		}

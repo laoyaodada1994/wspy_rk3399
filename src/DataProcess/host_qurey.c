@@ -47,7 +47,7 @@ void print_json(cJSON * root)
 ****************************************************************/
 int topic_querydown_handle(cJSON * root)
 {
-	cJSON * params, * obj, * resp, *resp_param;
+	cJSON * params, * obj, * resp=NULL, *resp_param;
     char tmp_str[32];
     char *pdata = NULL;
     // PublishFlag = 1;
@@ -115,7 +115,10 @@ query_resp:
 	pdata=cJSON_Print(resp);
 	printf("%s\n",pdata);
     mqtt_publish_msg(MQTT_TOPIC_QUERYUP,(uint8_t *)pdata,strlen(pdata) );
+    printf("free resp--------1\n");
     cJSON_Delete(resp);
+    printf("free resp--------2\n");
+    resp=NULL;
     return 0;
 }
 
@@ -130,7 +133,7 @@ query_resp:
 *************************************************************************/
 int rxmsg_json_parse(const char * topic, const char * json)
 {
-	cJSON * obj, * rxroot;
+	cJSON * obj, * rxroot=NULL;
 	
     rxroot = cJSON_Parse(json);
 
@@ -153,7 +156,7 @@ int rxmsg_json_parse(const char * topic, const char * json)
     		memset(Last_Json,0,strlen(Last_Json));
     		strcpy(Last_Json,json);
     	}
-        topic_querydown_handle(rxroot);
+  //      topic_querydown_handle(rxroot);
     } 
     else if (!strcmp(topic, "controlDown")) {
     	//memset(Last_Json,0,strlen(Last_Json));
@@ -163,7 +166,10 @@ int rxmsg_json_parse(const char * topic, const char * json)
     	}
         topic_controldown_handle(rxroot);
     } 
+    printf("rxroot111\n");
     cJSON_Delete(rxroot);
+    rxroot=NULL;
+    printf("rxroot222\n");
    return 0;
 }
 

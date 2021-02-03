@@ -101,6 +101,9 @@ const char * cover_to_chinese(const char *str){
 	else if(strstr(str,"apAccess")){
 		return "接入";
 	}
+	else if(strstr(str,"ctrlShell")){
+		return "远程shell";
+	}
 	else {
 		return "空闲";
 	}
@@ -339,6 +342,11 @@ void strobe_wifi_monitor(uint8_t ucchl,uint8_t ifup)
 #endif
     usleep(500000);
 
+    if(ucchl ==1 ||ucchl ==3){ //5.8g网卡需修改为5g信道
+	    memset(cmdbuf,0,sizeof(cmdbuf));
+    	sprintf(cmdbuf,"iwconfig %s channel %d",UserCfgJson.wlan_dev[ucchl],36);//控制网卡信道切换
+		system(cmdbuf);
+    }
     memset(cmdbuf,0,sizeof(cmdbuf));
     sprintf(cmdbuf,"ifconfig |grep %s",UserCfgJson.wlan_dev[ucchl]);
     sys_get(cmdbuf,getbuf,sizeof(getbuf));
