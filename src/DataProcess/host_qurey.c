@@ -47,10 +47,12 @@ void print_json(cJSON * root)
 ****************************************************************/
 int topic_querydown_handle(cJSON * root)
 {
-	cJSON * params, * obj, * resp=NULL, *resp_param;
+	cJSON * params=NULL, * obj=NULL;
     char tmp_str[32];
-    char *pdata = NULL;
     // PublishFlag = 1;
+    char publish_msg[1024];
+    char *strtail = publish_msg;
+#if 0
     print_json(root);
     resp = cJSON_CreateObject();
     cJSON_AddNumberToObject(resp, "sn", DeviceSN);
@@ -120,6 +122,77 @@ query_resp:
     printf("free resp--------2\n");
     resp=NULL;
     return 0;
+#else
+	params = cJSON_GetObjectItem(root, "params");
+	if (params == NULL)
+		return  -1;
+
+	obj = cJSON_GetObjectItem(root, "sid");
+	if (obj == NULL)
+		return -1;
+	strtail += sprintf(strtail, "{\"sn\": %u,", DeviceSN);
+	strtail += sprintf(strtail, "\"sid\": %u,", (uint32_t)obj->valueint);
+	strtail += sprintf(strtail, "\"params\": {");
+
+	if (cJSON_GetObjectItem(params, "ver") != NULL)
+	{
+		strtail += sprintf(strtail, "\"ver\":\"%s\",", FirmwareVersion);
+	}
+	if (cJSON_GetObjectItem(params, "ip") != NULL)
+	{
+		get_local_ip(tmp_str);
+		strtail += sprintf(strtail, "\"ip\":\"%s\",", tmp_str);
+	}
+	if (cJSON_GetObjectItem(params, "net") != NULL)
+	{
+		strtail += sprintf(strtail, "\"net\":\"%s\",", "以太网");
+	}
+    if (cJSON_GetObjectItem(params, "status") != NULL)
+	{
+    	get_dev_status(tmp_str);
+		strtail += sprintf(strtail, "\"status\":\"%s\",", tmp_str);
+	}
+    if (cJSON_GetObjectItem(params, "channel") != NULL)
+	{
+    	get_dev_channel(tmp_str);
+    	strtail += sprintf(strtail, "\"channel\":\"%s\",", tmp_str);
+	}
+    if (cJSON_GetObjectItem(params, "protocol") != NULL)
+    {
+	   strtail += sprintf(strtail, "\"protocol\":\"b/g/n,a/n/ac\",");
+    }
+    if (cJSON_GetObjectItem(params, "bandwidth") != NULL)
+	{
+    	get_dev_htmode(tmp_str);
+    	strtail += sprintf(strtail, "\"bandwidth\":\"20,20\",");
+	}
+    if (cJSON_GetObjectItem(params, "mode") != NULL)
+	{
+    	get_dev_mode(tmp_str);
+		strtail += sprintf(strtail, "\"mode\":\"%s\",", tmp_str);
+	}
+	if (cJSON_GetObjectItem(params, "cpu") != NULL) {
+		get_cpu_occupy(tmp_str);
+		strtail += sprintf(strtail, "\"cpu\":\"%s\",", tmp_str);
+	}
+	if (cJSON_GetObjectItem(params, "mem") != NULL) {
+		get_mem_occupy(tmp_str);
+		strtail += sprintf(strtail, "\"mem\":\"%s\",", tmp_str);
+	}
+	if (cJSON_GetObjectItem(params, "disk") != NULL) {
+	   // get_mem_occupy(tmp_str);
+		get_disk_occupy(tmp_str);
+		strtail += sprintf(strtail, "\"disk\":\"%s\",", tmp_str);
+	}
+	if (*(strtail - 1) == ',')
+		strtail--;
+	*strtail++ = '}'; // remove the last ","
+	*strtail++ = '}';
+	*strtail++ = '\0';
+	printf("%s\n",publish_msg);
+	mqtt_publish_msg(MQTT_TOPIC_QUERYUP,(uint8_t*) publish_msg,strlen(publish_msg));
+#endif
+	return 0;
 }
 
 
@@ -156,7 +229,7 @@ int rxmsg_json_parse(const char * topic, const char * json)
     		memset(Last_Json,0,strlen(Last_Json));
     		strcpy(Last_Json,json);
     	}
-  //      topic_querydown_handle(rxroot);
+        topic_querydown_handle(rxroot);
     } 
     else if (!strcmp(topic, "controlDown")) {
     	//memset(Last_Json,0,strlen(Last_Json));
