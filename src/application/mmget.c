@@ -210,7 +210,7 @@ void *mmget_file(void* argv)
 	memset(update,0,sizeof(update));
 	for (int cnt=0;cnt<data_size;cnt++){
 			//sprintf(optpath,"lftp -c 'lftp %s ;lcd %s ; get %s ; exit'",g_tmmfile.lftphost,g_tmmfile.lftplpath,g_tmm_data[cnt].ftpfile);
-			sprintf(optpath,"lftp -c 'set ssl:verify-certificate no;set xfer:clobber on;lcd %s ;get ftp://%s:21../../..%s; exit'",g_tmmfile.lftplpath,g_tmmfile.lftphost,g_tmm_data[cnt].ftpfile);
+			sprintf(optpath,"lftp -c 'set ssl:verify-certificate no;set xfer:clobber on;lcd %s ;get ftp://%s:10021../../..%s; exit'",g_tmmfile.lftplpath,g_tmmfile.lftphost,g_tmm_data[cnt].ftpfile);
 			printf("%s\n",optpath);
 			mmget_delete_file(cnt,mmfgrgc->settype,mmfgrgc->rtype,mmfgrgc->sid);
 			if(mmfgrgc->settype ==2){

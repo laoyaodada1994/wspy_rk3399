@@ -290,6 +290,9 @@ int topic_controldown_handle(cJSON * root)
     }
     else if (!strcmp(type->valuestring, "wifiStopScan")) {
         stop_sniffer();
+#ifdef WSPY_CAR
+
+#endif
         update_status("wifiScan", "result-manual", NULL);
         cJSON_AddStringToObject(resp, "error", "none");
     }

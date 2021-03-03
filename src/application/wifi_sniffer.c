@@ -838,7 +838,7 @@ static int format(char * buffer, const mac_link_info_t * info,uint8_t ucchl)
     }
     strcat(buffer, tmp);
     strcat(buffer, "}");
-  //  printf("ssid buf :%s\n",buffer);
+    printf("ssid buf :%s\n",buffer);
     return strlen(buffer);
 }
 
@@ -912,10 +912,9 @@ void radio_message_get(struct ieee80211_radiotap_iterator *iter,radiotap_data_t 
 			break;
 		case IEEE80211_RADIOTAP_DBM_ANTSIGNAL:
 			tmp_signal=*iter->this_arg;
-			printf("signal %d\n",tmp_signal);
 			if(pradio_data->signal < tmp_signal &&tmp_signal!=0){//modify by lpz 20201129 取最小值
 				pradio_data->signal = tmp_signal;
-				printf("use signal %d\n",pradio_data->signal);
+				//printf("use signal %d\n",pradio_data->signal);
 			}
 			break;
 		default:
@@ -959,7 +958,6 @@ void parse_packet(uint8_t * arg, const struct pcap_pkthdr * pkthdr, const uint8_
 		printf("malformed radiotap header (init returns %d) %d\n", res,packet[0]);
 		return ;
 	}
-    printf("kkkk\n");
     t_radio_tata.signal=-100;
     while (!(res = ieee80211_radiotap_iterator_next(&iter))) {
     	if (iter.is_radiotap_ns){
