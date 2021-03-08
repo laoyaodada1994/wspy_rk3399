@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "\"*.h\"": "\"c++\"",
+        "wifi_decrypt.h": "c",
+        "stdbool.h": "c"
+    }
+}

@@ -4,85 +4,70 @@
 #ifndef __COMMON_H
 #define __COMMON_H
 
-
 ////typedef unsigned int bool;
-//typedef enum{
+// typedef enum{
 //	false =0,
 //	true
 //};
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 //#include"../userheader.h"
 /*****************************************************************************
  * Macro
  */
-//typedef unsigned int bool;
+// typedef unsigned int bool;
+#include <stdint.h>
 #define FALSE 0
 #define TRUE 1
-#include<string.h>
+#include <string.h>
 
-
-typedef enum {
-	Abort_Level1=1,
-	Abort_Level2,
-	Abort_Level3,
-	Abort_Level4
-};
+typedef enum { Abort_Level1 = 1, Abort_Level2, Abort_Level3, Abort_Level4 };
 struct mqtt_msg {
-     char topic[16];
-     char payload[1024];
+    char topic[16];
+    char payload[1024];
 };
 
 typedef struct {
-     long type;
-     struct mqtt_msg mqtt;
+    long            type;
+    struct mqtt_msg mqtt;
 } msg_t;
-#define LONGITUDE	"longitude"
-#define LATITUDE	"latitude"
+#define LONGITUDE "longitude"
+#define LATITUDE "latitude"
 
 #undef bool
 #define bool unsigned int
 #ifndef offsetof
- #define offsetof(type, member)          ((size_t) &(((type *)0)->member))
+#define offsetof(type, member) ((size_t) & (((type *) 0)->member))
 #endif
 
 #ifndef container_of
- #define container_of(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type,member)))
+#define container_of(ptr, type, member) ((type *) ((char *) (ptr) -offsetof(type, member)))
 #endif
 /**Debug Information*/
 #define DEV_PREFIX "WIFI_ZK_INFO:"
-enum {
-	_ZK_NONE_=0,
-	_ZK_ALWAYS_,
-	_ZK_INFO,
-	_ZK_DEBUG,
-	_ZK_MAX_
-};
+enum { _ZK_NONE_ = 0, _ZK_ALWAYS_, _ZK_INFO, _ZK_DEBUG, _ZK_MAX_ };
 extern uint8_t zk_dev_log_level;
-#define ZK_DEV_PRINT(fmt,arg...)\
-	do{\
-		if(_ZK_ALWAYS_< zk_dev_log_level){\
-			printf(DEV_PREFIX fmt,##arg);\
-		}\
-	}while(0)
-
+#define ZK_DEV_PRINT(fmt, arg...)                                              \
+    do {                                                                       \
+        if (_ZK_ALWAYS_ < zk_dev_log_level) { printf(DEV_PREFIX fmt, ##arg); } \
+    } while (0)
 
 /*****************************************************************************
  * Type
  */
- 
+
 /*****************************************************************************
  * Declare
  */
 extern uint32_t DeviceSN;
 
-void strcpyl(char * dest, const char * src, size_t len);
-void sys_get(const char * cmd, char * output, size_t out_sz);
-void sys_set(const char * cmd, ...);
+void strcpyl(char *dest, const char *src, size_t len);
+void sys_get(const char *cmd, char *output, size_t out_sz);
+void sys_set(const char *cmd, ...);
 
 #ifdef __cplusplus
- }
+}
 #endif
 
-#endif //__COMMON_H
+#endif  //__COMMON_H
